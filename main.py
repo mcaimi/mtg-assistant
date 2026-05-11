@@ -5,20 +5,13 @@ import sys
 
 # main application for the MTG Assistant TUI
 try:
-    from libs.utils import Parameters
+    from libs.utils import Parameters, params_search_path
     from libs.tui import MTGAssistantApp
     from pymtgdeck import Deck
     import yaml
 except ImportError as e:
     print(f"Error importing modules: {e}")
     sys.exit(1)
-
-# parameters file search path
-params_search_path = [
-    "config/parameters.yaml",
-    "~/.config/mtg-assistant/parameters.yaml",
-    "/etc/mtg-assistant/parameters.yaml",
-]
 
 # search for the parameters file
 params_file = None
@@ -40,9 +33,14 @@ params = Parameters(params_file)
 os.makedirs(params.config.assets_base_path.decks, exist_ok=True)
 os.makedirs(params.config.assets_base_path.binders, exist_ok=True)
 
-deck = Deck()
-app = MTGAssistantApp(
-    deck=deck,
-    decks_directory=params.config.assets_base_path.decks,
-)
-app.run()
+# initialize the application
+def main():
+    deck = Deck()
+    app = MTGAssistantApp(
+            deck=deck,
+            decks_directory=params.config.assets_base_path.decks,
+        )
+    app.run()
+
+if __name__ == "__main__":
+    main()
