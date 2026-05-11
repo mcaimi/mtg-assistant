@@ -1,0 +1,6 @@
+---
+config:
+  base_url: https://api.scryfall.com
+  assets_base_path:
+    decks: ./assets/decks
+    binders: ./assets/binders
