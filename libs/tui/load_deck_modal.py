@@ -6,12 +6,74 @@ import json
 from pathlib import Path
 
 from pymtgdeck import Deck
-from textual import on
+from textual import on, work
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Vertical
+from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, Label, ListItem, ListView, Static
+
+
+class ConfirmDeleteDeckModal(ModalScreen[bool]):
+    """Ask before removing a deck JSON file from disk."""
+
+    BINDINGS = [
+        Binding("escape", "cancel", "Cancel", show=True),
+    ]
+
+    CSS = """
+    ConfirmDeleteDeckModal {
+        align: center middle;
+    }
+    #confirm-delete-dialog {
+        width: 62;
+        height: auto;
+        border: thick $error;
+        background: $surface;
+        padding: 1 2;
+    }
+    .dialog-title {
+        text-style: bold;
+        margin-bottom: 1;
+    }
+    #confirm-delete-warning {
+        color: $text-muted;
+        margin-bottom: 1;
+    }
+    #confirm-delete-buttons {
+        height: auto;
+        margin-top: 1;
+    }
+    """
+
+    def __init__(self, path: Path) -> None:
+        super().__init__()
+        self._path = path
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="confirm-delete-dialog"):
+            yield Static(
+                f"Delete deck file [bold]{self._path.name}[/bold]?",
+                classes="dialog-title",
+            )
+            yield Static("This cannot be undone.", id="confirm-delete-warning")
+            with Horizontal(id="confirm-delete-buttons"):
+                yield Button("Delete", id="confirm-delete-yes", variant="error")
+                yield Button("Cancel", id="confirm-delete-no", variant="primary")
+
+    def on_mount(self) -> None:
+        self.query_one("#confirm-delete-no", Button).focus()
+
+    @on(Button.Pressed, "#confirm-delete-yes")
+    def confirm_pressed(self) -> None:
+        self.dismiss(True)
+
+    @on(Button.Pressed, "#confirm-delete-no")
+    def cancel_pressed(self) -> None:
+        self.dismiss(False)
+
+    def action_cancel(self) -> None:
+        self.dismiss(False)
 
 
 def load_deck_from_json_path(path: Path) -> Deck:
@@ -48,6 +110,7 @@ class LoadDeckModal(ModalScreen[Deck | None]):
 
     BINDINGS = [
         Binding("escape", "close", "Close", show=True),
+        Binding("d", "delete_selected", "Delete deck file"),
     ]
 
     CSS = """
@@ -75,12 +138,14 @@ class LoadDeckModal(ModalScreen[Deck | None]):
     def __init__(self, decks_directory: Path | str) -> None:
         super().__init__()
         self._decks_dir = Path(decks_directory)
+        self._delete_target: Path | None = None
 
     def compose(self) -> ComposeResult:
         with Vertical(id="load-deck-dialog"):
             yield Static("Load deck", classes="dialog-title")
             yield Static(
-                "Choose a deck file (↑↓). [bold]Enter[/bold] loads it. [bold]Escape[/bold] closes.",
+                "Choose a deck file (↑↓). [bold]Enter[/bold] loads. [bold]d[/bold] deletes "
+                "(with confirmation). [bold]Escape[/bold] closes.",
                 classes="help",
             )
             paths = sorted(self._decks_dir.glob("*.json"))
@@ -120,3 +185,35 @@ class LoadDeckModal(ModalScreen[Deck | None]):
 
     def action_close(self) -> None:
         self.dismiss(None)
+
+    def action_delete_selected(self) -> None:
+        lv = self.query_one("#deck-files-list", ListView)
+        item = lv.highlighted_child
+        if not isinstance(item, DeckFileListItem):
+            return
+        self._delete_target = item.path
+        self.app.push_screen(ConfirmDeleteDeckModal(item.path), self._after_delete_confirm)
+
+    def _after_delete_confirm(self, confirmed: bool | None) -> None:
+        path = self._delete_target
+        self._delete_target = None
+        if not confirmed or path is None:
+            return
+        try:
+            path.unlink()
+        except OSError as exc:
+            self.app.notify(f"Could not delete file: {exc}", severity="error")
+            return
+        self.app.notify(f"Deleted {path.name}")
+        self._refresh_deck_file_list()
+
+    @work
+    async def _refresh_deck_file_list(self) -> None:
+        lv = self.query_one("#deck-files-list", ListView)
+        await lv.query("ListItem").remove()
+        paths = sorted(self._decks_dir.glob("*.json"))
+        if paths:
+            await lv.extend(DeckFileListItem(p) for p in paths)
+            lv.index = 0
+        else:
+            lv.index = None
