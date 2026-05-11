@@ -11,6 +11,8 @@ MTG Assistant is a terminal-based Magic: The Gathering deck builder application 
 - **Data Persistence**: Save decks to JSON files for later retrieval
 - **Cross-Platform**: Runs on macOS, Windows, and Linux
 
+![MTG Assistant Screenshot](img/mtg-assistant.png)
+
 ## Installation
 
 ### Prerequisites
