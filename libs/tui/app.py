@@ -13,7 +13,15 @@ try:
     from textual.app import App, ComposeResult
     from textual.binding import Binding
     from textual.containers import Horizontal, Vertical, VerticalScroll
-    from textual.widgets import Footer, Header, Label, ListItem, ListView, Static
+    from textual.widgets import (
+        Footer,
+        Header,
+        Label,
+        ListItem,
+        ListView,
+        ProgressBar,
+        Static,
+    )
 except ImportError as e:
     print(f"Error importing modules: {e}")
     sys.exit(1)
@@ -21,6 +29,7 @@ except ImportError as e:
 from .add_card_modal import AddCardModal
 from .formatting import format_deck_entry
 from .load_deck_modal import LoadDeckModal
+from .new_deck_modal import NewDeckModal
 
 
 class DeckListItem(ListItem):
@@ -37,8 +46,21 @@ class MTGAssistantApp(App[None]):
 
     BINDINGS: ClassVar[list[Binding]] = [
         Binding("a", "add_card", "Add card", priority=True),
+        Binding("n", "new_deck", "New deck", priority=True),
         Binding("s", "save_deck", "Save deck"),
         Binding("l", "load_deck", "Load deck"),
+        Binding(
+            "plus",
+            "entry_add_copy",
+            "+1 copy",
+            key_display="+",
+        ),
+        Binding(
+            "minus",
+            "entry_remove_copy",
+            "-1 copy",
+            key_display="-",
+        ),
     ]
 
     CSS = """
@@ -58,12 +80,34 @@ class MTGAssistantApp(App[None]):
         border: tall $primary-darken-2;
         padding: 0 1;
     }
+    #right-pane-scroll {
+        height: 1fr;
+        min-height: 0;
+    }
     .pane-title {
         text-style: bold;
         margin: 1 0;
     }
     #deck-list {
         height: 1fr;
+    }
+    #deck-size-footer {
+        height: auto;
+        margin-top: 1;
+        padding-top: 1;
+        border-top: solid $primary-darken-3;
+        align-horizontal: right;
+        width: 100%;
+    }
+    #deck-size-label {
+        margin-bottom: 1;
+        color: $text-muted;
+        text-align: right;
+        width: auto;
+    }
+    #deck-size-progress {
+        width: 36;
+        height: 1;
     }
     #entry-detail {
         height: 1fr;
@@ -80,11 +124,50 @@ class MTGAssistantApp(App[None]):
         file_name = hashlib.sha256(self.deck.name.encode()).hexdigest() + ".json"
         return self._backend.file_path / file_name
 
+    def _current_deck_list_row(self) -> DeckListItem | None:
+        """Highlighted deck row, only when no modal or pushed screen is above the main UI."""
+        if len(self.screen_stack) > 1:
+            return None
+        deck_list = self.query_one("#deck-list", ListView)
+        item = deck_list.highlighted_child
+        return item if isinstance(item, DeckListItem) else None
+
+    def action_entry_add_copy(self) -> None:
+        row = self._current_deck_list_row()
+        if row is None:
+            return
+        try:
+            self.deck.add_card(row.entry.card, 1)
+        except ValueError as exc:
+            self.notify(str(exc), severity="warning")
+            return
+        self._reload_deck_ui(reset_highlight=False)
+
+    def action_entry_remove_copy(self) -> None:
+        row = self._current_deck_list_row()
+        if row is None:
+            return
+        try:
+            self.deck.remove_card(row.entry.card, 1)
+        except ValueError as exc:
+            self.notify(str(exc), severity="warning")
+            return
+        self._reload_deck_ui(reset_highlight=False)
+
     def on_mount(self) -> None:
         self.title = "MTG Assistant"
         self.sub_title = self.deck.name
         deck_list = self.query_one("#deck-list", ListView)
         deck_list.focus()
+        self._update_deck_size_indicator()
+
+    def _update_deck_size_indicator(self) -> None:
+        bar = self.query_one("#deck-size-progress", ProgressBar)
+        label = self.query_one("#deck-size-label", Static)
+        current = self.deck.get_card_count()
+        limit = self.deck.max_card_count
+        bar.update(total=float(limit), progress=float(current))
+        label.update(f"{current} / {limit} cards")
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -96,9 +179,18 @@ class MTGAssistantApp(App[None]):
                     id="deck-list",
                     initial_index=0 if self.deck.entries else None,
                 )
-            with VerticalScroll(id="right-pane"):
-                yield Static("Selected card", classes="pane-title")
-                yield Static(self._empty_detail_text(), id="entry-detail")
+            with Vertical(id="right-pane"):
+                with VerticalScroll(id="right-pane-scroll"):
+                    yield Static("Selected card", classes="pane-title")
+                    yield Static(self._empty_detail_text(), id="entry-detail")
+                with Vertical(id="deck-size-footer"):
+                    yield Static("", id="deck-size-label")
+                    yield ProgressBar(
+                        id="deck-size-progress",
+                        total=float(self.deck.max_card_count),
+                        show_eta=False,
+                        show_percentage=False,
+                    )
         yield Footer()
 
     def _empty_detail_text(self) -> str:
@@ -136,6 +228,15 @@ class MTGAssistantApp(App[None]):
     def action_load_deck(self) -> None:
         self.push_screen(LoadDeckModal(self._backend.file_path), self._on_deck_loaded)
 
+    def action_new_deck(self) -> None:
+        self.push_screen(NewDeckModal(self._backend.file_path), self._on_new_deck_created)
+
+    def _on_new_deck_created(self, deck: Deck | None) -> None:
+        if deck is None:
+            return
+        self.deck = deck
+        self.notify_deck_changed()
+
     def _on_deck_loaded(self, deck: Deck | None) -> None:
         if deck is None:
             return
@@ -146,21 +247,30 @@ class MTGAssistantApp(App[None]):
         self._reload_deck_ui()
 
     @work
-    async def _reload_deck_ui(self) -> None:
+    async def _reload_deck_ui(self, *, reset_highlight: bool = True) -> None:
         deck_list = self.query_one("#deck-list", ListView)
         detail = self.query_one("#entry-detail", Static)
+        previous_index = deck_list.index
         await deck_list.query("ListItem").remove()
         if not self.deck.entries:
             deck_list.index = None
             detail.update(self._empty_detail_text())
             self.sub_title = self.deck.name
+            self._update_deck_size_indicator()
             return
         await deck_list.extend(DeckListItem(e) for e in self.deck.entries)
-        deck_list.index = 0
+        n = len(self.deck.entries)
+        if reset_highlight or previous_index is None:
+            deck_list.index = 0
+        else:
+            deck_list.index = min(previous_index, n - 1)
         highlighted = deck_list.highlighted_child
         if isinstance(highlighted, DeckListItem):
             detail.update(format_deck_entry(highlighted.entry))
+        else:
+            detail.update(self._empty_detail_text())
         self.sub_title = self.deck.name
+        self._update_deck_size_indicator()
 
 
 __all__ = ["MTGAssistantApp"]
