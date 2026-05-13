@@ -1,19 +1,25 @@
 #!/usr/bin/env python
 
-from __future__ import annotations
+# Pick a saved deck or binder.
 
 import json
 from pathlib import Path
 
-from pymtgdeck import Binder, Deck, Registry
-from textual import on, work
-from textual.app import ComposeResult
-from textual.binding import Binding
-from textual.containers import Horizontal, Vertical
-from textual.screen import ModalScreen
-from textual.widgets import Button, Label, ListItem, ListView, Static
 
+# import the necessary modules
+try:
+    from pymtgdeck import Binder, Deck, Registry
+    from textual import on, work
+    from textual.app import ComposeResult
+    from textual.binding import Binding
+    from textual.containers import Horizontal, Vertical
+    from textual.screen import ModalScreen
+    from textual.widgets import Button, Label, ListItem, ListView, Static
+except ImportError as e:
+    print(f"Error importing modules: {e}")
+    sys.exit(1)
 
+# confirm delete collection modal window in textual
 class ConfirmDeleteCollectionModal(ModalScreen[bool]):
     """Ask before removing a deck or binder JSON file from disk."""
 
@@ -101,7 +107,7 @@ class CollectionFileListItem(ListItem):
         self.collection: Deck | Binder | None = None
         try:
             self.collection = load_collection_from_path(path)
-            label_text = f"[{collection_type}] {display_name}  —  {path.name}"
+            label_text = f"[{self.collection_type}] {display_name}"
         except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
             label_text = f"{path.name}  [invalid: {exc}]"
             self.load_error = str(exc)
@@ -244,3 +250,6 @@ class LoadModal(ModalScreen[Deck | Binder | None]):
             lv.index = 0
         else:
             lv.index = None
+
+# export the load modal class
+__all__ = ["LoadModal"]

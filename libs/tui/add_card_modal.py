@@ -1,23 +1,32 @@
 #!/usr/bin/env python
 
-from __future__ import annotations
+# Search Scryfall and add copies of a card to the open deck or binder.
 
 import asyncio
 from collections.abc import Callable
 from functools import partial
 
-from pymtgdeck import Binder, Deck
-from pyscryfall import ScryfallApiError, ScryfallCard, search_cards_by_name
-from textual import on
-from textual.app import ComposeResult
-from textual.binding import Binding
-from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.screen import ModalScreen
-from textual.widgets import Button, Input, Label, ListItem, ListView, Static
+# load local classes and modules
+# depends on textual, pyscryfall and pymtgdeck
+try:
+    from pymtgdeck import Binder, Deck
+    from pyscryfall import ScryfallApiError, ScryfallCard, search_cards_by_name
+    from textual import on
+    from textual.app import ComposeResult
+    from textual.binding import Binding
+    from textual.containers import Horizontal, Vertical, VerticalScroll
+    from textual.screen import ModalScreen
+    from textual.widgets import (Button, Input, Label, ListItem, ListView, Static)
+except ImportError as e:
+    print(f"Error importing modules: {e}")
+    sys.exit(1)
 
+# load local formatting function
 from .formatting import format_scryfall_card
 
-
+# an item in the search results list
+# data comes from a ScryfallCard object populated by the search_cards_by_name function
+# scryfall apis must be reachable for this to work
 class SearchResultItem(ListItem):
     """A selectable row in the Scryfall search results list."""
 
@@ -26,13 +35,15 @@ class SearchResultItem(ListItem):
         name = card.name or "(unnamed)"
         set_code = card.set or "?"
         cn = card.collector_number or "?"
+        cmc = card.cmc or "?"
         rarity = card.rarity or "?"
-        super().__init__(Label(f"{name}  [{set_code}] #{cn}  {rarity}"))
+        super().__init__(Label(f"{name}  [{set_code}] #{cn}  CMC:{cmc}  Rarity: {rarity}"))
 
-
+# add card modal window in textual
 class AddCardModal(ModalScreen[None]):
     """Search Scryfall and add copies of a card to the open deck or binder."""
 
+    # keyboard bindings for the modal
     BINDINGS = [
         Binding("escape", "close", "Close", show=True),
     ]
@@ -64,6 +75,10 @@ class AddCardModal(ModalScreen[None]):
     .narrow-input {
         width: 8;
     }
+    .label-text {
+        align: left middle;
+        margin-right: 1;
+    }
     .dialog-title {
         text-style: bold;
         margin-bottom: 1;
@@ -77,12 +92,13 @@ class AddCardModal(ModalScreen[None]):
     def __init__(
         self,
         collection: Deck | Binder,
-        on_deck_changed: Callable[[], None] | None = None,
+        on_collection_changed: Callable[[], None] | None = None,
     ) -> None:
         super().__init__()
         self.collection = collection
-        self._on_deck_changed = on_deck_changed
+        self._on_collection_changed = on_collection_changed
 
+    # build the modal window and add widgets to it
     def compose(self) -> ComposeResult:
         is_deck = isinstance(self.collection, Deck)
         title = "Add card to deck" if is_deck else "Add card to binder"
@@ -96,16 +112,18 @@ class AddCardModal(ModalScreen[None]):
             yield Label("Matching prints (use ↑↓ to choose one):")
             yield ListView(id="search-results", initial_index=None)
             with Horizontal(id="add-row"):
-                yield Label("Copies:")
+                yield Label("Copies:", classes="label-text")
                 yield Input(value="1", id="copy-count-input", classes="narrow-input")
                 yield Button(add_label, id="add-btn", variant="success")
                 yield Button("Close", id="close-btn", variant="warning")
             with VerticalScroll(id="preview-scroll"):
                 yield Static("", id="preview-static")
 
+    # focus on the card name input when the modal is opened
     def on_mount(self) -> None:
         self.query_one("#card-name-input", Input).focus()
 
+    # search button callback
     @on(Button.Pressed, "#search-btn")
     async def search_pressed(self) -> None:
         query = self.query_one("#card-name-input", Input).value.strip()
@@ -140,6 +158,7 @@ class AddCardModal(ModalScreen[None]):
         await results.extend(SearchResultItem(c) for c in cards)
         results.index = 0
 
+    # add card button callback
     @on(Button.Pressed, "#add-btn")
     def add_pressed(self) -> None:
         status = self.query_one("#search-status", Static)
@@ -162,6 +181,10 @@ class AddCardModal(ModalScreen[None]):
         card = highlighted.card
         col = self.collection
 
+        # check if the collection is a deck or a binder
+        # for Decks, there are limits on the number of cards and the number of copies of each card
+        # for Binders, there are no limits
+        # so check the limits for decks and apply them to the collection
         if isinstance(col, Deck):
             current = col.get_card_copy_count(card)
             room_copies = col.max_card_copy_count - current
@@ -194,8 +217,8 @@ class AddCardModal(ModalScreen[None]):
         else:
             status.update(f"[green]Added {add_n}× {card.name or 'card'}.[/green]")
 
-        if callable(self._on_deck_changed):
-            self._on_deck_changed()
+        if callable(self._on_collection_changed):
+            self._on_collection_changed()
 
     @on(Button.Pressed, "#close-btn")
     def close_pressed(self) -> None:

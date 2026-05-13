@@ -1,19 +1,24 @@
 #!/usr/bin/env python
 
-from __future__ import annotations
+# Create a new deck or binder.
 
 from pathlib import Path
 
-from pymtgdeck import Binder, Deck
-from pymtgdeck.entities.deck import MAX_CARD_COPY_COUNT, MAX_CARD_COUNT
-from textual import on
-from textual.app import ComposeResult
-from textual.binding import Binding
-from textual.containers import Horizontal, Vertical
-from textual.screen import ModalScreen
-from textual.widgets import Button, Input, Label, RadioSet, Static
+# import the necessary modules
+try:
+    from pymtgdeck import Binder, Deck
+    from pymtgdeck.entities.deck import MAX_CARD_COPY_COUNT, MAX_CARD_COUNT
+    from textual import on
+    from textual.app import ComposeResult
+    from textual.binding import Binding
+    from textual.containers import Horizontal, Vertical
+    from textual.screen import ModalScreen
+    from textual.widgets import Button, Input, Label, RadioSet, Static
+except ImportError as e:
+    print(f"Error importing modules: {e}")
+    sys.exit(1)
 
-
+# create modal window in textual
 class CreateModal(ModalScreen[Deck | Binder | None]):
     """Create an empty deck (with size and per-card copy limits) or a binder (no such limits)."""
 
@@ -25,7 +30,7 @@ class CreateModal(ModalScreen[Deck | Binder | None]):
     CreateModal {
         align: center middle;
     }
-    #new-deck-dialog {
+    #new-collection-dialog {
         width: 72;
         height: auto;
         border: thick $primary;
@@ -47,59 +52,59 @@ class CreateModal(ModalScreen[Deck | Binder | None]):
     .field-row Input {
         width: 1fr;
     }
-    #new-deck-kind-hint {
+    #new-collection-kind-hint {
         color: $text-muted;
         margin-bottom: 1;
     }
-    #new-deck-status {
+    #new-collection-status {
         margin: 1 0;
         min-height: 1;
     }
-    #new-deck-buttons {
+    #new-collection-buttons {
         height: auto;
         margin-top: 1;
     }
     """
 
-    def __init__(self, decks_directory: Path | str) -> None:
+    def __init__(self, collection_directory: Path | str) -> None:
         super().__init__()
-        self._decks_dir = Path(decks_directory)
+        self._collection_dir = Path(collection_directory)
 
     def compose(self) -> ComposeResult:
-        with Vertical(id="new-deck-dialog"):
+        with Vertical(id="new-collection-dialog"):
             yield Label("New deck or binder", classes="dialog-title")
             yield Static(
                 "Choose the kind, set a name, then confirm. Decks use the limits below; binders do not.",
-                id="new-deck-kind-hint",
+                id="new-collection-kind-hint",
             )
             with Horizontal(classes="field-row"):
                 yield Label("Kind")
                 yield RadioSet("Deck", "Binder", id="new-collection-kind")
             with Horizontal(classes="field-row"):
                 yield Label("Name")
-                yield Input(placeholder="Collection name", id="new-deck-name")
-            with Vertical(id="new-deck-limits"):
+                yield Input(placeholder="Collection name", id="new-collection-name")
+            with Vertical(id="new-collection-limits"):
                 with Horizontal(classes="field-row"):
                     yield Label("Max cards in deck")
                     yield Input(
                         value=str(MAX_CARD_COUNT),
-                        id="new-deck-max-cards",
+                        id="new-collection-max-cards",
                         placeholder=str(MAX_CARD_COUNT),
                     )
                 with Horizontal(classes="field-row"):
                     yield Label("Max copies per card")
                     yield Input(
                         value=str(MAX_CARD_COPY_COUNT),
-                        id="new-deck-max-copies",
+                        id="new-collection-max-copies",
                         placeholder=str(MAX_CARD_COPY_COUNT),
                     )
-            yield Static("", id="new-deck-status")
-            with Horizontal(id="new-deck-buttons"):
-                yield Button("Create", id="new-deck-confirm", variant="primary")
-                yield Button("Cancel", id="new-deck-cancel", variant="warning")
+            yield Static("", id="new-collection-status")
+            with Horizontal(id="new-collection-buttons"):
+                yield Button("Create", id="new-collection-confirm", variant="primary")
+                yield Button("Cancel", id="new-collection-cancel", variant="warning")
 
     def on_mount(self) -> None:
-        self.query_one("#new-deck-name", Input).focus()
+        self.query_one("#new-collection-name", Input).focus()
         self._sync_limit_fields_enabled()
 
     def _is_binder_selected(self) -> bool:
@@ -111,13 +116,13 @@ class CreateModal(ModalScreen[Deck | Binder | None]):
 
     def _sync_limit_fields_enabled(self) -> None:
         binder = self._is_binder_selected()
-        for input_id in ("#new-deck-max-cards", "#new-deck-max-copies"):
+        for input_id in ("#new-collection-max-cards", "#new-collection-max-copies"):
             self.query_one(input_id, Input).disabled = binder
 
     @on(RadioSet.Changed, "#new-collection-kind")
     def collection_kind_changed(self, _event: RadioSet.Changed) -> None:
         self._sync_limit_fields_enabled()
-        self.query_one("#new-deck-status", Static).update("")
+        self.query_one("#new-collection-status", Static).update("")
 
     @staticmethod
     def _parse_positive_int(raw: str, field: str) -> int:
@@ -129,10 +134,10 @@ class CreateModal(ModalScreen[Deck | Binder | None]):
             raise ValueError(f"{field} must be at least 1")
         return value
 
-    @on(Button.Pressed, "#new-deck-confirm")
+    @on(Button.Pressed, "#new-collection-confirm")
     def confirm_pressed(self) -> None:
-        status = self.query_one("#new-deck-status", Static)
-        name = self.query_one("#new-deck-name", Input).value.strip()
+        status = self.query_one("#new-collection-status", Static)
+        name = self.query_one("#new-collection-name", Input).value.strip()
         if not name:
             status.update("[red]Please enter a name.[/red]")
             return
@@ -145,11 +150,11 @@ class CreateModal(ModalScreen[Deck | Binder | None]):
 
         try:
             max_cards = self._parse_positive_int(
-                self.query_one("#new-deck-max-cards", Input).value,
+                self.query_one("#new-collection-max-cards", Input).value,
                 "Max cards in deck",
             )
             max_copies = self._parse_positive_int(
-                self.query_one("#new-deck-max-copies", Input).value,
+                self.query_one("#new-collection-max-copies", Input).value,
                 "Max copies per card",
             )
         except ValueError as exc:
@@ -164,9 +169,12 @@ class CreateModal(ModalScreen[Deck | Binder | None]):
         self.app.notify(f"Created deck [bold]{name}[/bold]")
         self.dismiss(deck)
 
-    @on(Button.Pressed, "#new-deck-cancel")
+    @on(Button.Pressed, "#new-collection-cancel")
     def cancel_pressed(self) -> None:
         self.dismiss(None)
 
     def action_close(self) -> None:
         self.dismiss(None)
+
+# export the create modal class
+__all__ = ["CreateModal"]

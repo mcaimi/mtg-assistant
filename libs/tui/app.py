@@ -33,7 +33,9 @@ from .formatting import format_deck_entry
 from .load_modal import LoadModal
 from .create_modal import CreateModal
 
-
+# an item in the deck or binder
+# data comes from an Entry object populated by the Deck or Binder object
+# displays the card name and copy count
 class DeckListItem(ListItem):
     """Selectable row for one entry (card + copy count) in the deck or binder."""
 
@@ -42,7 +44,7 @@ class DeckListItem(ListItem):
         name = entry.card.name or "?"
         super().__init__(Label(f"{entry.count}× {name}"))
 
-
+# main application class
 class MTGAssistantApp(App[None]):
     """Browser for decks or binders: list on the left, card details on the right; [a] adds cards
     via Scryfall. [n] creates a new deck. [s] saves the current deck or binder. [l] loads a saved
@@ -93,10 +95,10 @@ class MTGAssistantApp(App[None]):
         text-style: bold;
         margin: 1 0;
     }
-    #deck-list {
+    #collection-list {
         height: 1fr;
     }
-    #deck-size-footer {
+    #collection-size-footer {
         height: auto;
         margin-top: 1;
         padding-top: 1;
@@ -104,13 +106,13 @@ class MTGAssistantApp(App[None]):
         align-horizontal: right;
         width: 100%;
     }
-    #deck-size-label {
+    #collection-size-label {
         margin-bottom: 1;
         color: $text-muted;
         text-align: right;
         width: auto;
     }
-    #deck-size-progress {
+    #collection-size-progress {
         width: 36;
         height: 1;
     }
@@ -121,52 +123,52 @@ class MTGAssistantApp(App[None]):
 
     def __init__(
         self,
-        deck: Deck | Binder,
+        collection: Deck | Binder,
         decks_directory: str,
         binders_directory: str,
         *,
         registry_root: str | Path | None = None,
     ) -> None:
         super().__init__()
-        self.deck = deck
+        self.collection = collection
         self._decks_backend = Backend(decks_directory)
         self._binders_backend = Backend(binders_directory)
         self._registry_root = Path(registry_root) if registry_root else Path(decks_directory).parent
 
     def _backend_for(self) -> Backend:
         """Decks and binders are stored under separate asset directories."""
-        return self._decks_backend if isinstance(self.deck, Deck) else self._binders_backend
+        return self._decks_backend if isinstance(self.collection, Deck) else self._binders_backend
 
     def _backend_save_path(self) -> Path:
         """Same filename rule as ``Backend.save`` (hash of collection ``name``)."""
-        file_name = hashlib.sha256(self.deck.name.encode()).hexdigest() + ".json"
+        file_name = hashlib.sha256(self.collection.name.encode()).hexdigest() + ".json"
         return self._backend_for().file_path / file_name
 
-    def _current_deck_list_row(self) -> DeckListItem | None:
+    def _current_collection_list_row(self) -> DeckListItem | None:
         """Highlighted deck row, only when no modal or pushed screen is above the main UI."""
         if len(self.screen_stack) > 1:
             return None
-        deck_list = self.query_one("#deck-list", ListView)
-        item = deck_list.highlighted_child
+        collection_list = self.query_one("#collection-list", ListView)
+        item = collection_list.highlighted_child
         return item if isinstance(item, DeckListItem) else None
 
     def action_entry_add_copy(self) -> None:
-        row = self._current_deck_list_row()
+        row = self._current_collection_list_row()
         if row is None:
             return
         try:
-            self.deck.add_card(row.entry.card, 1)
+            self.collection.add_card(row.entry.card, 1)
         except ValueError as exc:
             self.notify(str(exc), severity="warning")
             return
         self._reload_collection_ui(reset_highlight=False)
 
     def action_entry_remove_copy(self) -> None:
-        row = self._current_deck_list_row()
+        row = self._current_collection_list_row()
         if row is None:
             return
         try:
-            self.deck.remove_card(row.entry.card, 1)
+            self.collection.remove_card(row.entry.card, 1)
         except ValueError as exc:
             self.notify(str(exc), severity="warning")
             return
@@ -174,21 +176,21 @@ class MTGAssistantApp(App[None]):
 
     def on_mount(self) -> None:
         self.title = "MTG Assistant"
-        self.sub_title = self.deck.name
-        deck_list = self.query_one("#deck-list", ListView)
-        deck_list.focus()
-        self._update_deck_size_indicator()
+        self.sub_title = self.collection.name
+        collection_list = self.query_one("#collection-list", ListView)
+        collection_list.focus()
+        self._update_collection_size_indicator()
 
-    def _update_deck_size_indicator(self) -> None:
-        bar = self.query_one("#deck-size-progress", ProgressBar)
-        label = self.query_one("#deck-size-label", Static)
-        if isinstance(self.deck, Deck):
-            current = self.deck.get_card_count()
-            limit = self.deck.max_card_count
+    def _update_collection_size_indicator(self) -> None:
+        bar = self.query_one("#collection-size-progress", ProgressBar)
+        label = self.query_one("#collection-size-label", Static)
+        if isinstance(self.collection, Deck):
+            current = self.collection.get_card_count()
+            limit = self.collection.max_card_count
             bar.update(total=float(limit), progress=float(current))
             label.update(f"{current} / {limit} cards")
         else:
-            total = sum(e.count for e in self.deck.entries)
+            total = sum(e.count for e in self.collection.entries)
             bar.update(total=1.0, progress=1.0 if total else 0.0)
             label.update(f"{total} cards (binder)")
 
@@ -196,23 +198,23 @@ class MTGAssistantApp(App[None]):
         yield Header()
         with Horizontal(id="main-row"):
             with Vertical(id="left-pane"):
-                kind = "Deck" if isinstance(self.deck, Deck) else "Binder"
+                kind = "Deck" if isinstance(self.collection, Deck) else "Binder"
                 yield Static(kind, classes="pane-title", id="collection-pane-title")
                 yield ListView(
-                    *[DeckListItem(e) for e in self.deck.entries],
-                    id="deck-list",
-                    initial_index=0 if self.deck.entries else None,
+                    *[DeckListItem(e) for e in self.collection.entries],
+                    id="collection-list",
+                    initial_index=0 if self.collection.entries else None,
                 )
             with Vertical(id="right-pane"):
                 with VerticalScroll(id="right-pane-scroll"):
                     yield Static("Selected card", classes="pane-title")
                     yield Static(self._empty_detail_text(), id="entry-detail")
-                with Vertical(id="deck-size-footer"):
-                    yield Static("", id="deck-size-label")
+                with Vertical(id="collection-size-footer"):
+                    yield Static("", id="collection-size-label")
                     yield ProgressBar(
-                        id="deck-size-progress",
-                        total=float(self.deck.max_card_count)
-                        if isinstance(self.deck, Deck)
+                        id="collection-size-progress",
+                        total=float(self.collection.max_card_count)
+                        if isinstance(self.collection, Deck)
                         else 1.0,
                         show_eta=False,
                         show_percentage=False,
@@ -220,16 +222,16 @@ class MTGAssistantApp(App[None]):
         yield Footer()
 
     def _empty_detail_text(self) -> str:
-        if self.deck.entries:
-            return format_deck_entry(self.deck.entries[0])
+        if self.collection.entries:
+            return format_deck_entry(self.collection.entries[0])
         return (
             "No cards yet.\n\n"
             "Use [bold]a[/bold] to open the add-card dialog, search Scryfall, "
             "pick a print, set the number of copies, and add to this collection."
         )
 
-    @on(ListView.Highlighted, "#deck-list")
-    def deck_row_highlighted(self, event: ListView.Highlighted) -> None:
+    @on(ListView.Highlighted, "#collection-list")
+    def collection_row_highlighted(self, event: ListView.Highlighted) -> None:
         detail = self.query_one("#entry-detail", Static)
         item = event.item
         if isinstance(item, DeckListItem):
@@ -238,14 +240,14 @@ class MTGAssistantApp(App[None]):
             detail.update(self._empty_detail_text())
 
     def action_add_card(self) -> None:
-        self.push_screen(AddCardModal(self.deck, self.notify_collection_changed))
+        self.push_screen(AddCardModal(self.collection, self.notify_collection_changed))
 
     def action_save_collection(self) -> None:
         path = self._backend_save_path()
         if path.exists():
             path.unlink()
         try:
-            file_name = self._backend_for().save(self.deck)
+            file_name = self._backend_for().save(self.collection)
         except OSError as exc:
             self.notify(f"Could not save: {exc}", severity="error")
             return
@@ -261,13 +263,13 @@ class MTGAssistantApp(App[None]):
     def _on_new_collection_created(self, created: Deck | Binder | None) -> None:
         if created is None:
             return
-        self.deck = created
+        self.collection = created
         self.notify_collection_changed()
 
     def _on_collection_loaded(self, loaded: Deck | Binder | None) -> None:
         if loaded is None:
             return
-        self.deck = loaded
+        self.collection = loaded
         self.notify_collection_changed()
 
     def notify_collection_changed(self) -> None:
@@ -275,31 +277,31 @@ class MTGAssistantApp(App[None]):
 
     @work
     async def _reload_collection_ui(self, *, reset_highlight: bool = True) -> None:
-        deck_list = self.query_one("#deck-list", ListView)
+        collection_list = self.query_one("#collection-list", ListView)
         detail = self.query_one("#entry-detail", Static)
         pane_title = self.query_one("#collection-pane-title", Static)
-        pane_title.update("Deck" if isinstance(self.deck, Deck) else "Binder")
-        previous_index = deck_list.index
-        await deck_list.query("ListItem").remove()
-        if not self.deck.entries:
-            deck_list.index = None
+        pane_title.update("Deck" if isinstance(self.collection, Deck) else "Binder")
+        previous_index = collection_list.index
+        await collection_list.query("ListItem").remove()
+        if not self.collection.entries:
+            collection_list.index = None
             detail.update(self._empty_detail_text())
-            self.sub_title = self.deck.name
-            self._update_deck_size_indicator()
+            self.sub_title = self.collection.name
+            self._update_collection_size_indicator()
             return
-        await deck_list.extend(DeckListItem(e) for e in self.deck.entries)
-        n = len(self.deck.entries)
+        await collection_list.extend(DeckListItem(e) for e in self.collection.entries)
+        n = len(self.collection.entries)
         if reset_highlight or previous_index is None:
-            deck_list.index = 0
+            collection_list.index = 0
         else:
-            deck_list.index = min(previous_index, n - 1)
-        highlighted = deck_list.highlighted_child
+            collection_list.index = min(previous_index, n - 1)
+        highlighted = collection_list.highlighted_child
         if isinstance(highlighted, DeckListItem):
             detail.update(format_deck_entry(highlighted.entry))
         else:
             detail.update(self._empty_detail_text())
-        self.sub_title = self.deck.name
-        self._update_deck_size_indicator()
+        self.sub_title = self.collection.name
+        self._update_collection_size_indicator()
 
-
+# export the application class
 __all__ = ["MTGAssistantApp"]

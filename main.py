@@ -37,10 +37,10 @@ os.makedirs(params.config.assets_base_path.binders, exist_ok=True)
 
 # initialize the application
 def main():
-    deck = Deck()
+    collection = Deck()
     assets = params.config.assets_base_path
     app = MTGAssistantApp(
-        deck=deck,
+        collection=collection,
         decks_directory=str(assets.decks),
         binders_directory=str(assets.binders),
         registry_root=str(Path(assets.decks).parent),

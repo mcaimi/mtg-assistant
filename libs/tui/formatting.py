@@ -2,12 +2,16 @@
 
 """Plain-text / Rich markup helpers for card and deck entry display."""
 
-from __future__ import annotations
 
-from pymtgdeck import Entry
-from pyscryfall import ScryfallCard
+# import the necessary modules
+try:
+    from pymtgdeck import Entry
+    from pyscryfall import ScryfallCard
+except ImportError as e:
+    print(f"Error importing modules: {e}")
+    sys.exit(1)
 
-
+# format a Scryfall card for the detail / preview panel
 def format_scryfall_card(card: ScryfallCard) -> str:
     """Format a Scryfall card for the detail / preview panel."""
     lines: list[str] = []
