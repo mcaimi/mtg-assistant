@@ -6,7 +6,7 @@ import asyncio
 from collections.abc import Callable
 from functools import partial
 
-from pymtgdeck import Deck
+from pymtgdeck import Binder, Deck
 from pyscryfall import ScryfallApiError, ScryfallCard, search_cards_by_name
 from textual import on
 from textual.app import ComposeResult
@@ -31,7 +31,7 @@ class SearchResultItem(ListItem):
 
 
 class AddCardModal(ModalScreen[None]):
-    """Search Scryfall and add copies of a card to the open deck."""
+    """Search Scryfall and add copies of a card to the open deck or binder."""
 
     BINDINGS = [
         Binding("escape", "close", "Close", show=True),
@@ -74,14 +74,21 @@ class AddCardModal(ModalScreen[None]):
     }
     """
 
-    def __init__(self, deck: Deck, on_deck_changed: Callable[[], None] | None = None) -> None:
+    def __init__(
+        self,
+        collection: Deck | Binder,
+        on_deck_changed: Callable[[], None] | None = None,
+    ) -> None:
         super().__init__()
-        self.deck = deck
+        self.collection = collection
         self._on_deck_changed = on_deck_changed
 
     def compose(self) -> ComposeResult:
+        is_deck = isinstance(self.collection, Deck)
+        title = "Add card to deck" if is_deck else "Add card to binder"
+        add_label = "Add to deck" if is_deck else "Add to binder"
         with Vertical(id="add-card-dialog"):
-            yield Label("Add card to deck", classes="dialog-title")
+            yield Label(title, classes="dialog-title")
             with Horizontal(id="search-row"):
                 yield Input(placeholder="Card name…", id="card-name-input")
                 yield Button("Search", id="search-btn", variant="primary")
@@ -91,7 +98,7 @@ class AddCardModal(ModalScreen[None]):
             with Horizontal(id="add-row"):
                 yield Label("Copies:")
                 yield Input(value="1", id="copy-count-input", classes="narrow-input")
-                yield Button("Add to deck", id="add-btn", variant="success")
+                yield Button(add_label, id="add-btn", variant="success")
                 yield Button("Close", id="close-btn", variant="warning")
             with VerticalScroll(id="preview-scroll"):
                 yield Static("", id="preview-static")
@@ -153,34 +160,39 @@ class AddCardModal(ModalScreen[None]):
             return
 
         card = highlighted.card
-        current = self.deck.get_card_copy_count(card)
-        room_copies = self.deck.max_card_copy_count - current
-        room_total = self.deck.max_card_count - self.deck.get_card_count()
-        max_add = min(room_copies, room_total)
-        if max_add <= 0:
-            if room_total <= 0:
-                status.update("[red]Deck is full.[/red]")
-            else:
-                status.update(
-                    f"[red]Already have {current} copy/copies of this card "
-                    f"(max {self.deck.max_card_copy_count}).[/red]"
-                )
+        col = self.collection
+
+        if isinstance(col, Deck):
+            current = col.get_card_copy_count(card)
+            room_copies = col.max_card_copy_count - current
+            room_total = col.max_card_count - col.get_card_count()
+            max_add = min(room_copies, room_total)
+            if max_add <= 0:
+                if room_total <= 0:
+                    status.update("[red]Deck is full.[/red]")
+                else:
+                    status.update(
+                        f"[red]Already have {current} copy/copies of this card "
+                        f"(max {col.max_card_copy_count}).[/red]"
+                    )
+                return
+            add_n = min(want, max_add)
+        else:
+            add_n = want
+
+        try:
+            col.add_card(card, add_n)
+        except ValueError as exc:
+            status.update(f"[red]{exc}[/red]")
             return
 
-        add_n = min(want, max_add)
-        if add_n < want:
+        if isinstance(col, Deck) and add_n < want:
             status.update(
                 f"[yellow]Only {add_n} copy/copies fit "
                 f"(deck limits); added that many.[/yellow]"
             )
         else:
             status.update(f"[green]Added {add_n}× {card.name or 'card'}.[/green]")
-
-        try:
-            self.deck.add_card(card, add_n)
-        except ValueError as exc:
-            status.update(f"[red]{exc}[/red]")
-            return
 
         if callable(self._on_deck_changed):
             self._on_deck_changed()
