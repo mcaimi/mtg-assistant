@@ -156,7 +156,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "pymtgdeck", specifier = "==0.1.0" },
+    { name = "pymtgdeck", specifier = "==0.1.1" },
     { name = "pyscryfall", specifier = "==0.1.2" },
     { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "textual", specifier = ">=8.2.5" },
@@ -182,14 +182,14 @@ wheels = [
 
 [[package]]
 name = "pymtgdeck"
-version = "0.1.0"
+version = "0.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pyscryfall" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d3/03/1a1282fa4bdf1247f095bc910ace44259552430a652c0acc6d8ac327ad32/pymtgdeck-0.1.0.tar.gz", hash = "sha256:2d27991af0d39547c9a618edafc42fc8869f7674e5201319c7522485cb003b93", size = 35255, upload-time = "2026-05-04T18:51:07.599Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/43/71/90021d903c2bf583506e3b7daad9299a130229106ee6c5e16de12c9c4f9f/pymtgdeck-0.1.1.tar.gz", hash = "sha256:4ac7a4be468e3165e38fa9041cc7cc1e662ebba55251c575c65bb7bc5c80e8cb", size = 35561, upload-time = "2026-05-12T15:07:03.147Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/fd/a3/6731b3656f7d8d08658a0666c77520281088b6908e2f9b1d4a108b908552/pymtgdeck-0.1.0-py3-none-any.whl", hash = "sha256:5e058df38fafb1ebbf9af500829da8625d10af042a95abf2bee9e4a5d2454f22", size = 21936, upload-time = "2026-05-04T18:51:09.021Z" },
+    { url = "https://files.pythonhosted.org/packages/c2/a4/bdc81ba4814f3910ef47b3c9a7a65d106a02156173ed4227488c9ba8cc02/pymtgdeck-0.1.1-py3-none-any.whl", hash = "sha256:86a4195fb7fbfedb6ee8d73c7596619bc0356f2ad1d5fe5c691667b635f64621", size = 22481, upload-time = "2026-05-12T15:07:01.906Z" },
 ]
 
 [[package]]
