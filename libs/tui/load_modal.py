@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from pymtgdeck import Deck
+from pymtgdeck import Binder, Deck, Registry
 from textual import on, work
 from textual.app import ComposeResult
 from textual.binding import Binding
@@ -14,15 +14,15 @@ from textual.screen import ModalScreen
 from textual.widgets import Button, Label, ListItem, ListView, Static
 
 
-class ConfirmDeleteDeckModal(ModalScreen[bool]):
-    """Ask before removing a deck JSON file from disk."""
+class ConfirmDeleteCollectionModal(ModalScreen[bool]):
+    """Ask before removing a deck or binder JSON file from disk."""
 
     BINDINGS = [
         Binding("escape", "cancel", "Cancel", show=True),
     ]
 
     CSS = """
-    ConfirmDeleteDeckModal {
+    ConfirmDeleteCollectionModal {
         align: center middle;
     }
     #confirm-delete-dialog {
@@ -53,7 +53,7 @@ class ConfirmDeleteDeckModal(ModalScreen[bool]):
     def compose(self) -> ComposeResult:
         with Vertical(id="confirm-delete-dialog"):
             yield Static(
-                f"Delete deck file [bold]{self._path.name}[/bold]?",
+                f"Delete file [bold]{self._path.name}[/bold]?",
                 classes="dialog-title",
             )
             yield Static("This cannot be undone.", id="confirm-delete-warning")
@@ -76,48 +76,51 @@ class ConfirmDeleteDeckModal(ModalScreen[bool]):
         self.dismiss(False)
 
 
-def load_deck_from_json_path(path: Path) -> Deck:
-    """Load a ``Deck`` from either a bare ``Deck.to_dict()`` JSON or a ``Backend`` envelope."""
+def load_collection_from_path(path: Path) -> Deck | Binder:
+    """Load a ``Deck`` or ``Binder`` from a ``Backend`` envelope JSON on disk."""
     with open(path, encoding="utf-8") as f:
         raw = json.load(f)
     if not isinstance(raw, dict):
-        raise ValueError("Deck file must contain a JSON object")
-    if raw.get("type") == "Deck" and isinstance(raw.get("data"), dict):
-        return Deck.from_dict(raw["data"])
-    if raw.get("type") == "Binder":
-        raise ValueError("File is a binder, not a deck")
-    return Deck.from_dict(raw)
+        raise ValueError("File must contain a JSON object")
+    kind = raw.get("type")
+    data = raw.get("data")
+    if kind == "Deck" and isinstance(data, dict):
+        return Deck.from_dict(data)
+    if kind == "Binder" and isinstance(data, dict):
+        return Binder.from_dict(data)
+    raise ValueError(f"Unsupported or missing type (expected Deck or Binder), got {kind!r}")
 
 
-class DeckFileListItem(ListItem):
-    """One row in the load-deck file list."""
+class CollectionFileListItem(ListItem):
+    """One row in the load dialog, backed by a path from ``Registry``."""
 
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, collection_type: str, display_name: str) -> None:
         self.path = path
+        self.collection_type = collection_type
         self.load_error: str | None = None
-        self.deck: Deck | None = None
+        self.collection: Deck | Binder | None = None
         try:
-            self.deck = load_deck_from_json_path(path)
-            label_text = f"{self.deck.name}  —  {path.name}"
+            self.collection = load_collection_from_path(path)
+            label_text = f"[{collection_type}] {display_name}  —  {path.name}"
         except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
             label_text = f"{path.name}  [invalid: {exc}]"
             self.load_error = str(exc)
         super().__init__(Label(label_text))
 
 
-class LoadDeckModal(ModalScreen[Deck | None]):
-    """Pick a ``*.json`` deck file from the decks directory and load it into the app."""
+class LoadModal(ModalScreen[Deck | Binder | None]):
+    """Pick a saved ``Deck`` or ``Binder`` discovered via ``Registry`` under ``registry_root``."""
 
     BINDINGS = [
         Binding("escape", "close", "Close", show=True),
-        Binding("d", "delete_selected", "Delete deck file"),
+        Binding("d", "delete_selected", "Delete file"),
     ]
 
     CSS = """
-    LoadDeckModal {
+    LoadModal {
         align: center middle;
     }
-    #load-deck-dialog {
+    #load-collection-dialog {
         width: 80;
         max-height: 90%;
         height: auto;
@@ -125,7 +128,7 @@ class LoadDeckModal(ModalScreen[Deck | None]):
         background: $surface;
         padding: 1 2;
     }
-    #deck-files-list {
+    #collection-files-list {
         height: 16;
         margin: 1 0;
     }
@@ -135,51 +138,68 @@ class LoadDeckModal(ModalScreen[Deck | None]):
     }
     """
 
-    def __init__(self, decks_directory: Path | str) -> None:
+    def __init__(self, registry_root: Path | str) -> None:
         super().__init__()
-        self._decks_dir = Path(decks_directory)
+        self._registry_root = Path(registry_root)
         self._delete_target: Path | None = None
 
+    def _registry_entries(self) -> list[dict]:
+        reg = Registry(str(self._registry_root))
+        return sorted(
+            reg.registry,
+            key=lambda e: (str(e.get("type", "")), str(e.get("name", "")).lower(), str(e.get("path", ""))),
+        )
+
     def compose(self) -> ComposeResult:
-        with Vertical(id="load-deck-dialog"):
-            yield Static("Load deck", classes="dialog-title")
+        with Vertical(id="load-collection-dialog"):
+            yield Static("Load deck or binder", classes="dialog-title")
             yield Static(
-                "Choose a deck file (↑↓). [bold]Enter[/bold] loads. [bold]d[/bold] deletes "
+                "Saved collections (↑↓). [bold]Enter[/bold] loads. [bold]d[/bold] deletes "
                 "(with confirmation). [bold]Escape[/bold] closes.",
                 classes="help",
             )
-            paths = sorted(self._decks_dir.glob("*.json"))
-            if not paths:
-                yield Static(f"No .json files in [bold]{self._decks_dir}[/bold].", id="no-files")
+            entries = self._registry_entries()
+            if not entries:
+                yield Static(
+                    f"No Deck/Binder JSON under [bold]{self._registry_root}[/bold].",
+                    id="no-files",
+                )
             yield ListView(
-                *[DeckFileListItem(p) for p in paths],
-                id="deck-files-list",
-                initial_index=0 if paths else None,
+                *[
+                    CollectionFileListItem(
+                        Path(e["path"]),
+                        str(e.get("type", "?")),
+                        str(e.get("name", Path(e["path"]).name)),
+                    )
+                    for e in entries
+                ],
+                id="collection-files-list",
+                initial_index=0 if entries else None,
             )
             with Vertical(classes="button-row"):
-                yield Button("Close", id="load-deck-close", variant="warning")
+                yield Button("Close", id="load-collection-close", variant="warning")
 
     def on_mount(self) -> None:
-        lv = self.query_one("#deck-files-list", ListView)
+        lv = self.query_one("#collection-files-list", ListView)
         if lv.children:
             lv.focus()
         else:
-            self.query_one("#load-deck-close", Button).focus()
+            self.query_one("#load-collection-close", Button).focus()
 
-    @on(ListView.Selected, "#deck-files-list")
-    def deck_file_selected(self, event: ListView.Selected) -> None:
+    @on(ListView.Selected, "#collection-files-list")
+    def collection_file_selected(self, event: ListView.Selected) -> None:
         item = event.item
-        if not isinstance(item, DeckFileListItem):
+        if not isinstance(item, CollectionFileListItem):
             return
-        if item.deck is None:
+        if item.collection is None:
             self.app.notify(
                 f"Cannot load {item.path.name}: {item.load_error or 'unknown error'}",
                 severity="error",
             )
             return
-        self.dismiss(item.deck)
+        self.dismiss(item.collection)
 
-    @on(Button.Pressed, "#load-deck-close")
+    @on(Button.Pressed, "#load-collection-close")
     def close_pressed(self) -> None:
         self.dismiss(None)
 
@@ -187,12 +207,12 @@ class LoadDeckModal(ModalScreen[Deck | None]):
         self.dismiss(None)
 
     def action_delete_selected(self) -> None:
-        lv = self.query_one("#deck-files-list", ListView)
+        lv = self.query_one("#collection-files-list", ListView)
         item = lv.highlighted_child
-        if not isinstance(item, DeckFileListItem):
+        if not isinstance(item, CollectionFileListItem):
             return
         self._delete_target = item.path
-        self.app.push_screen(ConfirmDeleteDeckModal(item.path), self._after_delete_confirm)
+        self.app.push_screen(ConfirmDeleteCollectionModal(item.path), self._after_delete_confirm)
 
     def _after_delete_confirm(self, confirmed: bool | None) -> None:
         path = self._delete_target
@@ -205,15 +225,22 @@ class LoadDeckModal(ModalScreen[Deck | None]):
             self.app.notify(f"Could not delete file: {exc}", severity="error")
             return
         self.app.notify(f"Deleted {path.name}")
-        self._refresh_deck_file_list()
+        self._refresh_collection_file_list()
 
     @work
-    async def _refresh_deck_file_list(self) -> None:
-        lv = self.query_one("#deck-files-list", ListView)
+    async def _refresh_collection_file_list(self) -> None:
+        lv = self.query_one("#collection-files-list", ListView)
         await lv.query("ListItem").remove()
-        paths = sorted(self._decks_dir.glob("*.json"))
-        if paths:
-            await lv.extend(DeckFileListItem(p) for p in paths)
+        entries = self._registry_entries()
+        if entries:
+            await lv.extend(
+                CollectionFileListItem(
+                    Path(e["path"]),
+                    str(e.get("type", "?")),
+                    str(e.get("name", Path(e["path"]).name)),
+                )
+                for e in entries
+            )
             lv.index = 0
         else:
             lv.index = None
