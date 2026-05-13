@@ -7,8 +7,8 @@ from .parameters import Parameters
 
 # parameters file search path
 params_search_path = [
-    "config/parameters.yaml",
     "~/.config/mtg-assistant/parameters.yaml",
+    "config/parameters.yaml",
     "/etc/mtg-assistant/parameters.yaml",
 ]
 

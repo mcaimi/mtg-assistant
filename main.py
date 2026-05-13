@@ -17,7 +17,8 @@ except ImportError as e:
 # search for the parameters file
 params_file = None
 for path in params_search_path:
-    if os.path.exists(path):
+    path = Path(path).expanduser()
+    if path.exists():
         # load the parameters file
         with open(path, "r") as f:
             params_file = yaml.load(f, Loader=yaml.FullLoader)
