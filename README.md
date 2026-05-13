@@ -1,15 +1,24 @@
 # MTG Assistant
 
-MTG Assistant is a terminal-based Magic: The Gathering deck builder application built with Python and the Textual framework. It allows users to create, manage, and organize their Magic: The Gathering decks directly in the terminal.
+MTG Assistant is a terminal-based Magic: The Gathering deck builder application built with Python and the Textual framework. It allows users to create, manage, and organize their Magic: The Gathering decks (and binders) directly in the terminal.
 
 ## Features
 
-- **Deck Management**: Create, load, save, and manage Magic: The Gathering decks
-- **Card Search**: Integration with Scryfall API for searching and adding cards
-- **Terminal Interface**: Modern, interactive TUI (Textual User Interface) built with Textual framework
-- **Deck Limits**: Configurable limits for maximum cards and copies per card
-- **Data Persistence**: Save decks to JSON files for later retrieval
-- **Cross-Platform**: Runs on macOS, Windows, and Linux
+- **Deck and binder management**: Create, load, save, and switch between **decks** (60-card style limits from `pymtgdeck`) and **binders** (collections without those deck constraints)
+- **Registry-based loading**: Saved decks and binders are listed together via `pymtgdeck`’s `Registry` under the assets root, so files in both deck and binder directories appear in one load dialog
+- **Card search**: Integration with the Scryfall API for searching and adding cards to the open deck or binder
+- **Terminal interface**: Interactive TUI built with Textual
+- **Copy adjustment**: `+` / `-` on the main screen add or remove one copy of the highlighted card (deck legality rules apply when the collection is a deck)
+- **Data persistence**: Collections save as JSON envelopes (`Deck` / `Binder`) through `pymtgdeck`’s `Backend`
+- **Configurable paths**: `parameters.yaml` is loaded from the first existing path in a fixed search order (including a user config directory under the home folder)
+- **Cross-platform**: Runs on macOS, Windows, and Linux
+
+### Recent updates and fixes
+
+- **Configuration resolution**: The app loads `parameters.yaml` from the first path that exists: `~/.config/mtg-assistant/parameters.yaml`, then `config/parameters.yaml` in the project, then `/etc/mtg-assistant/parameters.yaml`. This avoids silently ignoring a user-level config when a minimal project file is present.
+- **Binders and decks**: `CreateModal` and `AddCardModal` work with either a `Deck` or a `Binder`; the header and size bar reflect deck limits vs binder totals.
+- **Load dialog**: `LoadModal` replaces separate deck-only loading; it uses `Registry`, supports invalid-file rows with an error hint, and **`d`** deletes the highlighted file after a confirmation modal (no longer a global “delete current deck” shortcut on the main screen).
+- **Dependency refresh**: Pinned `pymtgdeck==0.1.1` and `pyscryfall==0.1.2` with Textual 8.x.
 
 ![MTG Assistant Screenshot](img/mtg-assistant.png)
 
@@ -34,29 +43,30 @@ MTG Assistant is a terminal-based Magic: The Gathering deck builder application 
    uv run main.py
    ```
 
-2. The application will initialize with a default deck and create necessary directories
+2. The application starts with an empty default **deck** and ensures the deck and binder asset directories exist (from your resolved config).
 
-3. Use the arrow keys to navigate the interface and enter key to interact with options
+3. Use the arrow keys to move in lists, **Enter** to confirm, and **Escape** to close modals. The footer shows the main key bindings.
 
 ## Project Structure
 
 ```
 mtg-assistant/
-├── main.py                 # Main application entry point
+├── main.py                 # Entry point: resolve config, mkdirs, run TUI
 ├── config/
-│   └── parameters.yaml     # Configuration file for Scryfall API URL and asset paths
+│   └── parameters.yaml     # Default in-repo config (overridden by user paths if present)
 ├── libs/
-│   ├── tui/                 # Textual User Interface components
-│   │   ├── app.py           # Main application class
-│   │   ├── add_card_modal.py # Modal for adding cards via Scryfall search
-│   │   ├── formatting.py    # Text formatting functions for card display
-│   │   ├── load_deck_modal.py # Modal for loading existing decks
-│   │   └── new_deck_modal.py # Modal for creating new decks
+│   ├── tui/
+│   │   ├── app.py              # MTGAssistantApp
+│   │   ├── add_card_modal.py   # Scryfall search → add to deck or binder
+│   │   ├── create_modal.py     # New deck or binder (+ deck limits)
+│   │   ├── load_modal.py       # Registry-backed load + delete file
+│   │   └── formatting.py       # Rich text for cards and entries
 │   └── utils/
-│       └── formatting.py   # Utility functions for text formatting
+│       ├── __init__.py         # Parameters export + params_search_path
+│       └── parameters.py       # YAML → nested Parameters objects
 └── assets/
-    ├── decks/              # Directory for saved decks
-    └── binders/            # Directory for saved binders
+    ├── decks/              # Saved deck JSON files
+    └── binders/          # Saved binder JSON files
 ```
 
 ## Architecture Overview
@@ -65,134 +75,128 @@ mtg-assistant/
 
 The MTG Assistant follows a component-based architecture using the Textual framework:
 
-1. Main Application (`MTGAssistantApp` in `libs/tui/app.py`)
-2. Modal Screens for various operations (add card, load deck, new deck creation)
-3. Data Models from external libraries (`Deck`, `Entry`, `Backend` from `pymtgdeck`)
-4. Scryfall API Integration (`pyscryfall` library)
+1. Main application (`MTGAssistantApp` in `libs/tui/app.py`) — holds either a `Deck` or `Binder`, two `Backend` instances (decks vs binders dirs), and a **registry root** (typically the parent of `assets/decks` and `assets/binders`) for discovery.
+2. Modals: `AddCardModal`, `CreateModal`, `LoadModal` (plus confirm-delete sub-screen in `load_modal.py`).
+3. Data models from `pymtgdeck`: `Deck`, `Binder`, `Entry`, `Backend`, `Registry`.
+4. Scryfall integration via `pyscryfall`.
 
 ### Class Diagram
 
 ```mermaid
 classDiagram
     class MTGAssistantApp {
-        -Deck deck
-        -Backend _backend
-        +push_screen()
-        +action_save_deck()
-        +action_new_deck()
-        +action_load_deck()
         +action_add_card()
-        +action_delete_deck()
-        +_on_new_deck_created()
-        +_on_deck_loaded()
-        +_on_deck_changed()
-        +_backend_save_path()
+        +action_new_collection()
+        +action_save_collection()
+        +action_load_collection()
+        +action_entry_add_copy()
+        +action_entry_remove_copy()
+        +notify_collection_changed()
     }
 
     class Deck {
-        -List~Entry~ entries
+        +entries
         +add_card()
         +remove_card()
-        +get_card_count()
-        +get_entry_count()
+    }
+
+    class Binder {
+        +entries
+        +add_card()
+        +remove_card()
     }
 
     class Backend {
-        -str decks_directory
         +save()
         +load()
-        +list_decks()
     }
 
     class Entry {
-        -str card_name
-        -int count
-        -str card_id
+        +card
+        +count
     }
 
     class AddCardModal {
-        -Deck deck
-        -function on_deck_changed
-        +search_cards()
     }
 
-    class LoadDeckModal {
-        -str decks_directory
-        -function on_deck_loaded
-        -function on_deck_deleted
+    class LoadModal {
     }
 
-    class NewDeckModal {
-        -str decks_directory
-        -function on_new_deck_created
+    class CreateModal {
     }
 
-    class SearchResultItem {
-        -ScryfallCard card
-    }
-
-    class DeckListItem {
-        -Entry entry
-    }
-
-    class ScryfallCard {
-        -str name
-        -str mana_cost
-        -int cmc
-        -str type_line
-        -str oracle_text
-        -str rarity
-        -str image_uris
+    class Registry {
     }
 
     MTGAssistantApp --> Deck : uses
+    MTGAssistantApp --> Binder : uses
     MTGAssistantApp --> Backend : uses
     MTGAssistantApp --> AddCardModal : displays
-    MTGAssistantApp --> LoadDeckModal : displays
-    MTGAssistantApp --> NewDeckModal : displays
+    MTGAssistantApp --> LoadModal : displays
+    MTGAssistantApp --> CreateModal : displays
     AddCardModal --> Deck : modifies
-    LoadDeckModal --> Backend : uses
-    NewDeckModal --> Backend : uses
+    AddCardModal --> Binder : modifies
+    LoadModal --> Registry : uses
     Deck --> Entry : contains
-    Backend --> Deck : loads/saves
-    SearchResultItem --> ScryfallCard : displays
-    DeckListItem --> Entry : displays
+    Binder --> Entry : contains
 ```
 
 ## Usage
 
-### Main Interface
+### Main interface
 
-The main application window displays:
-1. **Deck List** (left panel): Shows all cards in the current deck
-2. **Card Details** (right panel): Displays detailed information about the selected card
-3. **Navigation Controls**: Keyboard shortcuts for various operations
+The main window shows:
 
-### Available Operations
+1. **Collection list** (left): Cards in the current deck or binder
+2. **Card details** (right): Oracle text and metadata for the highlighted entry
+3. **Size indicator** (footer): Deck shows count vs `max_card_count`; binder shows total cards
 
-- **Save Deck**: Press `s` to save the current deck
-- **New Deck**: Press `n` to create a new empty deck  
-- **Load Deck**: Press `l` to load an existing deck
-- **Add Card**: Press `a` to search and add cards
-- **Delete Deck**: Press `d` to delete the current deck from the filesystem
+### Main key bindings
+
+| Key | Action |
+|-----|--------|
+| `a` | Open add-card (Scryfall search) |
+| `n` | New deck or binder (`CreateModal`) |
+| `l` | Load a saved deck or binder (`LoadModal`) |
+| `s` | Save the current collection to its backend directory |
+| `+` / `-` | Add or remove one copy of the highlighted card |
+
+### Load dialog (`l`)
+
+- **Enter** on a row loads that file (invalid JSON shows an error instead of loading).
+- **`d`** deletes the highlighted file after confirmation.
+- **Escape** closes without loading.
 
 ### Configuration
 
-The application can be configured via `config/parameters.yaml`:
+The first existing file from this list is used:
+
+1. `~/.config/mtg-assistant/parameters.yaml`
+2. `config/parameters.yaml` (repository default)
+3. `/etc/mtg-assistant/parameters.yaml`
+
+Example shape (nested under `config`):
+
 ```yaml
-base_url: "https://api.scryfall.com"
-decks_directory: "assets/decks"
-binders_directory: "assets/binders"
+config:
+  base_url: https://api.scryfall.com
+  assets_base_path:
+    decks: ./assets/decks
+    binders: ./assets/binders
 ```
+
+`main.py` creates `assets_base_path.decks` and `assets_base_path.binders` if they are missing.
 
 ## Dependencies
 
-The MTG Assistant requires the following Python packages:
+| Package | Role |
+|---------|------|
+| `pymtgdeck` | Decks, binders, backends, registry |
+| `pyscryfall` | Scryfall API |
+| `pyyaml` | Configuration |
+| `textual` | Terminal UI |
 
-- `pymtgdeck`: Core deck management library 
-- `pyscryfall`: Scryfall API integration
-- `pyyaml`: YAML parsing for configuration
-- `textual`: Textual framework for terminal UI
+Pinned versions are listed in `pyproject.toml` (currently `pymtgdeck==0.1.1`, `pyscryfall==0.1.2`).
 
 ## License
 
@@ -206,5 +210,5 @@ Part of this project has been developed with the assistance of an AI Model. I us
 
 - Thanks to the Scryfall API for providing card data
 - Built with the [Textual](https://github.com/Textualize/textual) framework
-- Uses [pymtgdeck](https://codeberg.org/mcaimi/pymtgdeck) for deck management functionality
-- Uses [pyscryfall](https://codeberg.org/mcaimi/pyscryfall) for interactions with scryfall APIs
+- Uses [pymtgdeck](https://codeberg.org/mcaimi/pymtgdeck) for deck and binder management
+- Uses [pyscryfall](https://codeberg.org/mcaimi/pyscryfall) for interactions with Scryfall APIs
