@@ -8,6 +8,19 @@ from pathlib import Path
 from typing import ClassVar
 
 # import the necessary modules
+_LOGO_PATH = Path(__file__).resolve().parent / "logo.utf8"
+
+
+def _load_logo_banner():
+    """ASCII art logo from ``logo.utf8`` (ANSI colors), or empty if missing."""
+    from rich.text import Text
+
+    try:
+        return Text.from_ansi(_LOGO_PATH.read_text(encoding="utf-8").rstrip("\n"))
+    except OSError:
+        return ""
+
+
 try:
     from pymtgdeck import Backend, Binder, Deck, Entry
     from textual import on, work
@@ -71,6 +84,12 @@ class MTGAssistantApp(App[None]):
     ]
 
     CSS = """
+    #app-banner {
+        height: auto;
+        width: 100%;
+        padding: 0 1 1 1;
+        content-align: center middle;
+    }
     #main-row {
         height: 1fr;
     }
@@ -196,6 +215,7 @@ class MTGAssistantApp(App[None]):
 
     def compose(self) -> ComposeResult:
         yield Header()
+        yield Static(_load_logo_banner(), id="app-banner", markup=False)
         with Horizontal(id="main-row"):
             with Vertical(id="left-pane"):
                 kind = "Deck" if isinstance(self.collection, Deck) else "Binder"
