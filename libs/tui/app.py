@@ -22,7 +22,7 @@ def _load_logo_banner():
 
 
 try:
-    from pymtgdeck import Backend, Binder, Deck, Entry
+    from pymtgdeck import Backend, Binder, Deck, Entry, deck_cmc_histogram
     from textual import on, work
     from textual.app import App, ComposeResult
     from textual.binding import Binding
@@ -117,6 +117,21 @@ class MTGAssistantApp(App[None]):
     #collection-list {
         height: 1fr;
     }
+    #mana-curve {
+        height: auto;
+        margin-top: 1;
+        padding: 1 1 0 1;
+        border-top: solid $primary-darken-3;
+        width: 100%;
+    }
+    #mana-curve-title {
+        text-style: bold;
+        margin-bottom: 1;
+    }
+    #mana-curve-chart {
+        height: auto;
+        width: 100%;
+    }
     #collection-size-footer {
         height: auto;
         margin-top: 1;
@@ -199,6 +214,39 @@ class MTGAssistantApp(App[None]):
         collection_list = self.query_one("#collection-list", ListView)
         collection_list.focus()
         self._update_collection_size_indicator()
+        self._update_mana_curve()
+
+    _MANA_CURVE_MAX_HEIGHT = 8
+
+    def _render_mana_curve(self) -> str:
+        """Build a text-based vertical bar chart of card counts by CMC."""
+        if not isinstance(self.collection, Deck) or not self.collection.entries:
+            return "[dim]No data[/dim]"
+
+        counts, edges = deck_cmc_histogram(self.collection)
+        int_counts = [int(c) for c in counts]
+        max_c = max(int_counts, default=0)
+        if max_c == 0:
+            return "[dim]No data[/dim]"
+
+        n = len(int_counts)
+        display_h = min(max_c, self._MANA_CURVE_MAX_HEIGHT)
+        scale = max_c / display_h
+
+        lines: list[str] = []
+        for level in range(display_h, 0, -1):
+            threshold = level * scale
+            row = " ".join("██" if c >= threshold else "  " for c in int_counts)
+            lines.append(row)
+
+        lines.append("──" + "───" * (n - 1))
+        lines.append(" ".join(f"{int(edges[i]):>2}" for i in range(n)))
+        lines.append(" ".join(f"[bold]{c:>2}[/bold]" for c in int_counts))
+        return "\n".join(lines)
+
+    def _update_mana_curve(self) -> None:
+        chart = self.query_one("#mana-curve-chart", Static)
+        chart.update(self._render_mana_curve())
 
     def _update_collection_size_indicator(self) -> None:
         bar = self.query_one("#collection-size-progress", ProgressBar)
@@ -229,6 +277,9 @@ class MTGAssistantApp(App[None]):
                 with VerticalScroll(id="right-pane-scroll"):
                     yield Static("Selected card", classes="pane-title")
                     yield Static(self._empty_detail_text(), id="entry-detail")
+                with Vertical(id="mana-curve"):
+                    yield Static("Mana Curve", id="mana-curve-title")
+                    yield Static(self._render_mana_curve(), id="mana-curve-chart")
                 with Vertical(id="collection-size-footer"):
                     yield Static("", id="collection-size-label")
                     yield ProgressBar(
@@ -308,6 +359,7 @@ class MTGAssistantApp(App[None]):
             detail.update(self._empty_detail_text())
             self.sub_title = self.collection.name
             self._update_collection_size_indicator()
+            self._update_mana_curve()
             return
         await collection_list.extend(DeckListItem(e) for e in self.collection.entries)
         n = len(self.collection.entries)
@@ -322,6 +374,7 @@ class MTGAssistantApp(App[None]):
             detail.update(self._empty_detail_text())
         self.sub_title = self.collection.name
         self._update_collection_size_indicator()
+        self._update_mana_curve()
 
 # export the application class
 __all__ = ["MTGAssistantApp"]

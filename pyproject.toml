@@ -5,8 +5,8 @@ description = "Magic The Gathering Assistant App"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "pymtgdeck==0.1.1",
-    "pyscryfall==0.1.2",
+    "pymtgdeck==0.1.2",
+    "pyscryfall>=0.1.2",
     "pyyaml>=6.0.3",
     "textual>=8.2.5",
 ]
