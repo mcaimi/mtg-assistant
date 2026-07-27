@@ -37,7 +37,7 @@ os.makedirs(params.config.assets_base_path.binders, exist_ok=True)
 
 # initialize the application
 def main():
-    collection = Deck()
+    collection = Deck.standard()
     assets = params.config.assets_base_path
     app = MTGAssistantApp(
         collection=collection,

@@ -49,53 +49,6 @@ class AddCardModal(ModalScreen[None]):
         Binding("escape", "close", "Close", show=True),
     ]
 
-    CSS = """
-    AddCardModal {
-        align: center middle;
-    }
-    #add-card-dialog {
-        width: 88;
-        max-height: 90%;
-        height: auto;
-        border: thick $primary;
-        background: $surface;
-        padding: 1 2;
-    }
-    #search-row {
-        height: auto;
-        margin-bottom: 0;
-    }
-    #card-name-input {
-        width: 1fr;
-        margin-right: 1;
-    }
-    #autocomplete-hints {
-        height: auto;
-        min-height: 1;
-        color: $text-muted;
-        margin-bottom: 1;
-    }
-    #search-results {
-        height: 12;
-        margin: 1 0;
-    }
-    .narrow-input {
-        width: 8;
-    }
-    .label-text {
-        align: left middle;
-        margin-right: 1;
-    }
-    .dialog-title {
-        text-style: bold;
-        margin-bottom: 1;
-    }
-    #preview-scroll {
-        max-height: 14;
-        margin-top: 1;
-    }
-    """
-
     def __init__(
         self,
         collection: Deck | Binder,

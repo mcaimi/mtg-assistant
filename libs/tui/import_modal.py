@@ -29,39 +29,6 @@ class ImportDeckModal(ModalScreen["Deck | None"]):
         Binding("escape", "close", "Cancel", show=True),
     ]
 
-    CSS = """
-    ImportDeckModal {
-        align: center middle;
-    }
-    #import-dialog {
-        width: 80;
-        max-height: 90%;
-        height: auto;
-        border: thick $primary;
-        background: $surface;
-        padding: 1 2;
-    }
-    .dialog-title {
-        text-style: bold;
-        margin-bottom: 1;
-    }
-    #import-hint {
-        color: $text-muted;
-        margin-bottom: 1;
-    }
-    #deck-text-input {
-        height: 16;
-        margin-bottom: 1;
-    }
-    #import-status {
-        min-height: 1;
-        margin-bottom: 1;
-    }
-    #import-buttons {
-        height: auto;
-    }
-    """
-
     def __init__(self, collection: Deck) -> None:
         super().__init__()
         self._collection = collection
@@ -73,7 +40,7 @@ class ImportDeckModal(ModalScreen["Deck | None"]):
                 "Paste a deck list — one [bold]<count> <card name>[/bold] per line. "
                 "Lines starting with [bold]//[/bold] are ignored. "
                 "Each card is looked up on Scryfall (requires network access).",
-                id="import-hint",
+                classes="dialog-hint",
             )
             yield TextArea(id="deck-text-input")
             yield Static("", id="import-status")

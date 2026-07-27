@@ -1,14 +1,13 @@
 #!/usr/bin/env python
 
-# Pick a saved deck or binder.
+"""Pick a saved deck, sideboard, or binder."""
 
 import json
+import sys
 from pathlib import Path
 
-
-# import the necessary modules
 try:
-    from pymtgdeck import Binder, Deck, Registry
+    from pymtgdeck import Binder, Deck, Registry, Sideboard
     from textual import on, work
     from textual.app import ComposeResult
     from textual.binding import Binding
@@ -19,38 +18,13 @@ except ImportError as e:
     print(f"Error importing modules: {e}")
     sys.exit(1)
 
-# confirm delete collection modal window in textual
+
 class ConfirmDeleteCollectionModal(ModalScreen[bool]):
-    """Ask before removing a deck or binder JSON file from disk."""
+    """Ask before removing a collection JSON file from disk."""
 
     BINDINGS = [
         Binding("escape", "cancel", "Cancel", show=True),
     ]
-
-    CSS = """
-    ConfirmDeleteCollectionModal {
-        align: center middle;
-    }
-    #confirm-delete-dialog {
-        width: 62;
-        height: auto;
-        border: thick $error;
-        background: $surface;
-        padding: 1 2;
-    }
-    .dialog-title {
-        text-style: bold;
-        margin-bottom: 1;
-    }
-    #confirm-delete-warning {
-        color: $text-muted;
-        margin-bottom: 1;
-    }
-    #confirm-delete-buttons {
-        height: auto;
-        margin-top: 1;
-    }
-    """
 
     def __init__(self, path: Path) -> None:
         super().__init__()
@@ -83,7 +57,7 @@ class ConfirmDeleteCollectionModal(ModalScreen[bool]):
 
 
 def load_collection_from_path(path: Path) -> Deck | Binder:
-    """Load a ``Deck`` or ``Binder`` from a ``Backend`` envelope JSON on disk."""
+    """Load a Deck, Sideboard, or Binder from a Backend envelope JSON on disk."""
     with open(path, encoding="utf-8") as f:
         raw = json.load(f)
     if not isinstance(raw, dict):
@@ -92,13 +66,15 @@ def load_collection_from_path(path: Path) -> Deck | Binder:
     data = raw.get("data")
     if kind == "Deck" and isinstance(data, dict):
         return Deck.from_dict(data)
+    if kind == "Sideboard" and isinstance(data, dict):
+        return Sideboard.from_dict(data)
     if kind == "Binder" and isinstance(data, dict):
         return Binder.from_dict(data)
-    raise ValueError(f"Unsupported or missing type (expected Deck or Binder), got {kind!r}")
+    raise ValueError(f"Unsupported or missing type (expected Deck/Sideboard/Binder), got {kind!r}")
 
 
 class CollectionFileListItem(ListItem):
-    """One row in the load dialog, backed by a path from ``Registry``."""
+    """One row in the load dialog, backed by a path from Registry."""
 
     def __init__(self, path: Path, collection_type: str, display_name: str) -> None:
         self.path = path
@@ -115,34 +91,12 @@ class CollectionFileListItem(ListItem):
 
 
 class LoadModal(ModalScreen[Deck | Binder | None]):
-    """Pick a saved ``Deck`` or ``Binder`` discovered via ``Registry`` under ``registry_root``."""
+    """Pick a saved Deck, Sideboard, or Binder discovered via Registry."""
 
     BINDINGS = [
         Binding("escape", "close", "Close", show=True),
         Binding("d", "delete_selected", "Delete file"),
     ]
-
-    CSS = """
-    LoadModal {
-        align: center middle;
-    }
-    #load-collection-dialog {
-        width: 80;
-        max-height: 90%;
-        height: auto;
-        border: thick $primary;
-        background: $surface;
-        padding: 1 2;
-    }
-    #collection-files-list {
-        height: 16;
-        margin: 1 0;
-    }
-    .dialog-title {
-        text-style: bold;
-        margin-bottom: 1;
-    }
-    """
 
     def __init__(self, registry_root: Path | str) -> None:
         super().__init__()
@@ -158,16 +112,16 @@ class LoadModal(ModalScreen[Deck | Binder | None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="load-collection-dialog"):
-            yield Static("Load deck or binder", classes="dialog-title")
+            yield Static("Load collection", classes="dialog-title")
             yield Static(
                 "Saved collections (↑↓). [bold]Enter[/bold] loads. [bold]d[/bold] deletes "
                 "(with confirmation). [bold]Escape[/bold] closes.",
-                classes="help",
+                classes="dialog-hint",
             )
             entries = self._registry_entries()
             if not entries:
                 yield Static(
-                    f"No Deck/Binder JSON under [bold]{self._registry_root}[/bold].",
+                    f"No Deck/Sideboard/Binder JSON under [bold]{self._registry_root}[/bold].",
                     id="no-files",
                 )
             yield ListView(
@@ -251,5 +205,5 @@ class LoadModal(ModalScreen[Deck | Binder | None]):
         else:
             lv.index = None
 
-# export the load modal class
+
 __all__ = ["LoadModal"]

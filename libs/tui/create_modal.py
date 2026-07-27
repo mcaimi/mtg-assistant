@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 
-# Create a new deck or binder.
+"""Create a new deck, sideboard, or binder."""
 
 import sys
 from pathlib import Path
 
 try:
-    from pymtgdeck import Binder, Deck
+    from pymtgdeck import Binder, Deck, Sideboard
     from textual import on
     from textual.app import ComposeResult
     from textual.binding import Binding
@@ -19,57 +19,19 @@ except ImportError as e:
 
 # Presets: (max_card_count, max_card_copy_count)
 _PRESETS: dict[str, tuple[int, int]] = {
-    "Standard": (60, 4),
-    "Limited": (40, 4),
+    "Standard":  (60, 4),
+    "Limited":   (40, 4),
     "Commander": (100, 1),
+    "Sideboard": (15, 4),
 }
 
+
 class CreateModal(ModalScreen[Deck | Binder | None]):
-    """Create an empty deck (with optional format preset) or a binder."""
+    """Create an empty deck (with optional format preset), sideboard, or binder."""
 
     BINDINGS = [
         Binding("escape", "close", "Close", show=True),
     ]
-
-    CSS = """
-    CreateModal {
-        align: center middle;
-    }
-    #new-collection-dialog {
-        width: 76;
-        height: auto;
-        border: thick $primary;
-        background: $surface;
-        padding: 1 2;
-    }
-    .dialog-title {
-        text-style: bold;
-        margin-bottom: 1;
-    }
-    .field-row {
-        height: auto;
-        margin-bottom: 1;
-    }
-    .field-row Label {
-        width: 26;
-        content-align: left middle;
-    }
-    .field-row Input {
-        width: 1fr;
-    }
-    #new-collection-kind-hint {
-        color: $text-muted;
-        margin-bottom: 1;
-    }
-    #new-collection-status {
-        margin: 1 0;
-        min-height: 1;
-    }
-    #new-collection-buttons {
-        height: auto;
-        margin-top: 1;
-    }
-    """
 
     def __init__(self, collection_directory: Path | str) -> None:
         super().__init__()
@@ -77,16 +39,17 @@ class CreateModal(ModalScreen[Deck | Binder | None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="new-collection-dialog"):
-            yield Label("New deck or binder", classes="dialog-title")
+            yield Label("New collection", classes="dialog-title")
             yield Static(
                 "Choose a preset or [bold]Custom Deck[/bold] to set limits manually. "
                 "[bold]Binder[/bold] has no card limits.",
-                id="new-collection-kind-hint",
+                classes="dialog-hint",
             )
             with Horizontal(classes="field-row"):
                 yield Label("Kind / Preset")
                 yield RadioSet(
-                    "Standard", "Limited", "Commander", "Custom Deck", "Binder",
+                    "Standard", "Limited", "Commander", "Sideboard",
+                    "Custom Deck", "Binder",
                     id="new-collection-kind",
                 )
             with Horizontal(classes="field-row"):
@@ -95,18 +58,10 @@ class CreateModal(ModalScreen[Deck | Binder | None]):
             with Vertical(id="new-collection-limits"):
                 with Horizontal(classes="field-row"):
                     yield Label("Max cards in deck")
-                    yield Input(
-                        value="60",
-                        id="new-collection-max-cards",
-                        placeholder="60",
-                    )
+                    yield Input(value="60", id="new-collection-max-cards", placeholder="60")
                 with Horizontal(classes="field-row"):
                     yield Label("Max copies per card")
-                    yield Input(
-                        value="4",
-                        id="new-collection-max-copies",
-                        placeholder="4",
-                    )
+                    yield Input(value="4", id="new-collection-max-copies", placeholder="4")
             yield Static("", id="new-collection-status")
             with Horizontal(id="new-collection-buttons"):
                 yield Button("Create", id="new-collection-confirm", variant="primary")
@@ -164,6 +119,11 @@ class CreateModal(ModalScreen[Deck | Binder | None]):
             self.dismiss(Binder(name=name))
             return
 
+        if kind == "Sideboard":
+            self.app.notify(f"Created sideboard [bold]{name}[/bold]")
+            self.dismiss(Sideboard(name=name))
+            return
+
         if kind in _PRESETS:
             mc, mcc = _PRESETS[kind]
             deck = Deck(max_card_copy_count=mcc, max_card_count=mc, name=name)
@@ -195,5 +155,6 @@ class CreateModal(ModalScreen[Deck | Binder | None]):
 
     def action_close(self) -> None:
         self.dismiss(None)
+
 
 __all__ = ["CreateModal"]

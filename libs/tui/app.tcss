@@ -1,0 +1,396 @@
+/* ===================================================================
+   MTG Assistant — global stylesheet
+   All widget/modal CSS lives here; loaded via MTGAssistantApp.CSS_PATH
+   =================================================================== */
+
+/* ----- Main app layout ----- */
+
+#app-banner {
+    height: auto;
+    width: 100%;
+    padding: 0 1 1 1;
+    content-align: center middle;
+}
+
+#main-row {
+    height: 1fr;
+}
+
+#left-pane {
+    width: 38%;
+    min-width: 24;
+    height: 1fr;
+    border: tall $primary-darken-2;
+    padding: 0 1;
+}
+
+#right-pane {
+    width: 1fr;
+    height: 1fr;
+    border: tall $primary-darken-2;
+    padding: 0 1;
+}
+
+#right-pane-scroll {
+    height: 1fr;
+    min-height: 0;
+}
+
+.pane-title {
+    text-style: bold;
+    margin: 1 0;
+}
+
+#filter-input {
+    margin-bottom: 1;
+}
+
+#collection-list {
+    height: 1fr;
+}
+
+/* ----- Right pane: mana curve ----- */
+
+#mana-curve {
+    height: auto;
+    margin-top: 1;
+    padding: 1 1 0 1;
+    border-top: solid $primary-darken-3;
+    width: 100%;
+}
+
+#cmc-stats {
+    height: auto;
+    color: $text-muted;
+    margin-bottom: 1;
+}
+
+#mana-curve-title {
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+#mana-curve-chart {
+    height: auto;
+    width: 100%;
+}
+
+/* ----- Right pane: type & color distribution ----- */
+
+#type-color-dist {
+    height: auto;
+    border-top: solid $primary-darken-3;
+    padding: 1 1 0 1;
+    margin-top: 0;
+}
+
+#type-distribution {
+    height: auto;
+    margin-bottom: 1;
+}
+
+#color-distribution {
+    height: auto;
+}
+
+/* ----- Right pane: legality panel (toggled with f) ----- */
+
+#legality-panel {
+    height: auto;
+    border-top: solid $primary-darken-3;
+    padding: 1 1 0 1;
+    display: none;
+}
+
+#legality-content {
+    height: auto;
+}
+
+/* ----- Right pane: footer (size + value) ----- */
+
+#collection-size-footer {
+    height: auto;
+    margin-top: 1;
+    padding-top: 1;
+    border-top: solid $primary-darken-3;
+    align-horizontal: right;
+    width: 100%;
+}
+
+#deck-value-label {
+    color: $text-muted;
+    text-align: right;
+    width: auto;
+}
+
+#collection-size-label {
+    margin-bottom: 1;
+    color: $text-muted;
+    text-align: right;
+    width: auto;
+}
+
+#collection-size-progress {
+    width: 36;
+    height: 1;
+}
+
+#entry-detail {
+    height: 1fr;
+}
+
+/* ----- Shared modal helpers ----- */
+
+.dialog-title {
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+.dialog-hint {
+    color: $text-muted;
+    margin-bottom: 1;
+}
+
+/* ----- AddCardModal ----- */
+
+AddCardModal {
+    align: center middle;
+}
+
+#add-card-dialog {
+    width: 88;
+    max-height: 90%;
+    height: auto;
+    border: thick $primary;
+    background: $surface;
+    padding: 1 2;
+}
+
+#search-row {
+    height: auto;
+    margin-bottom: 0;
+}
+
+#card-name-input {
+    width: 1fr;
+    margin-right: 1;
+}
+
+#autocomplete-hints {
+    height: auto;
+    min-height: 1;
+    color: $text-muted;
+    margin-bottom: 1;
+}
+
+#search-results {
+    height: 12;
+    margin: 1 0;
+}
+
+.narrow-input {
+    width: 8;
+}
+
+.label-text {
+    align: left middle;
+    margin-right: 1;
+}
+
+#preview-scroll {
+    max-height: 14;
+    margin-top: 1;
+}
+
+/* ----- CreateModal ----- */
+
+CreateModal {
+    align: center middle;
+}
+
+#new-collection-dialog {
+    width: 76;
+    height: auto;
+    border: thick $primary;
+    background: $surface;
+    padding: 1 2;
+}
+
+.field-row {
+    height: auto;
+    margin-bottom: 1;
+}
+
+.field-row Label {
+    width: 26;
+    content-align: left middle;
+}
+
+.field-row Input {
+    width: 1fr;
+}
+
+#new-collection-status {
+    margin: 1 0;
+    min-height: 1;
+}
+
+#new-collection-buttons {
+    height: auto;
+    margin-top: 1;
+}
+
+/* ----- LoadModal ----- */
+
+LoadModal {
+    align: center middle;
+}
+
+#load-collection-dialog {
+    width: 80;
+    max-height: 90%;
+    height: auto;
+    border: thick $primary;
+    background: $surface;
+    padding: 1 2;
+}
+
+#collection-files-list {
+    height: 16;
+    margin: 1 0;
+}
+
+/* ----- ConfirmDeleteCollectionModal ----- */
+
+ConfirmDeleteCollectionModal {
+    align: center middle;
+}
+
+#confirm-delete-dialog {
+    width: 62;
+    height: auto;
+    border: thick $error;
+    background: $surface;
+    padding: 1 2;
+}
+
+#confirm-delete-warning {
+    color: $text-muted;
+    margin-bottom: 1;
+}
+
+#confirm-delete-buttons {
+    height: auto;
+    margin-top: 1;
+}
+
+/* ----- ImportDeckModal ----- */
+
+ImportDeckModal {
+    align: center middle;
+}
+
+#import-dialog {
+    width: 80;
+    max-height: 90%;
+    height: auto;
+    border: thick $primary;
+    background: $surface;
+    padding: 1 2;
+}
+
+#deck-text-input {
+    height: 16;
+    margin-bottom: 1;
+}
+
+#import-status {
+    min-height: 1;
+    margin-bottom: 1;
+}
+
+#import-buttons {
+    height: auto;
+}
+
+/* ----- RulingsModal ----- */
+
+RulingsModal {
+    align: center middle;
+}
+
+#rulings-dialog {
+    width: 80;
+    max-height: 90%;
+    height: auto;
+    border: thick $primary;
+    background: $surface;
+    padding: 1 2;
+}
+
+#rulings-scroll {
+    height: 24;
+    margin: 1 0;
+    border: solid $primary-darken-3;
+    padding: 0 1;
+}
+
+#rulings-status {
+    min-height: 1;
+    color: $text-muted;
+}
+
+#rulings-buttons {
+    height: auto;
+    margin-top: 1;
+}
+
+/* ----- DeckDiffModal ----- */
+
+DeckDiffModal {
+    align: center middle;
+}
+
+#diff-dialog {
+    width: 84;
+    max-height: 90%;
+    height: auto;
+    border: thick $primary;
+    background: $surface;
+    padding: 1 2;
+}
+
+#diff-select-list {
+    height: 10;
+    margin: 1 0;
+}
+
+#diff-results {
+    height: auto;
+    border-top: solid $primary-darken-3;
+    padding-top: 1;
+    margin-top: 1;
+    display: none;
+}
+
+#diff-added {
+    height: auto;
+    color: $success;
+    margin-bottom: 1;
+}
+
+#diff-removed {
+    height: auto;
+    color: $error;
+    margin-bottom: 1;
+}
+
+#diff-changed {
+    height: auto;
+    color: $warning;
+}
+
+#diff-buttons {
+    height: auto;
+    margin-top: 1;
+}
