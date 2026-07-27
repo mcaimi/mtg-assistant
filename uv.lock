@@ -156,7 +156,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "pymtgdeck", specifier = "==0.1.2" },
+    { name = "pymtgdeck", specifier = "==0.2.0" },
     { name = "pyscryfall", specifier = ">=0.1.2" },
     { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "textual", specifier = ">=8.2.5" },
@@ -243,27 +243,27 @@ wheels = [
 
 [[package]]
 name = "pymtgdeck"
-version = "0.1.2"
+version = "0.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy" },
     { name = "pyscryfall" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/2b/92/be381c3023ea9014fc73a4f81b59974e7daca5a2c245af2a8d5398ce08fe/pymtgdeck-0.1.2.tar.gz", hash = "sha256:f29905c64d3bced940c8fa74916910663fe656779b7e2fb06ad494299d5594d3", size = 70959, upload-time = "2026-06-05T15:49:57.152Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e0/1b/78ff56b8f4d4add1094cd6d564fed1a862f7959bb8cdac7f53e6bb3156e9/pymtgdeck-0.2.0.tar.gz", hash = "sha256:4f8e93a6336132c994a59a24a81bee9a5dbf9c8474aa55138665146118581290", size = 79652, upload-time = "2026-07-26T17:23:17.563Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0c/4b/eb4546313bb2a24c212d2c46e191c9517c41b663b303fed69cda6695476e/pymtgdeck-0.1.2-py3-none-any.whl", hash = "sha256:03e4cde971b12100d313f5fa13516df7e30e6d019fed281a7c618666550d9e57", size = 24310, upload-time = "2026-06-05T15:49:58.446Z" },
+    { url = "https://files.pythonhosted.org/packages/aa/e9/fe4d66313d55f975d58fbdffe388e171ee519dbe070342d5ef3de4a1cb23/pymtgdeck-0.2.0-py3-none-any.whl", hash = "sha256:3a23530ef6e91510072ab1ca4ab56c8bdad4479a4e510301e84bb11cf0f0cb65", size = 30638, upload-time = "2026-07-26T17:23:16.084Z" },
 ]
 
 [[package]]
 name = "pyscryfall"
-version = "0.1.2"
+version = "0.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "requests" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/89/31/f8bd16400cbba1898e25dced44decc456f1742b52b68897bda75d9ec4ff1/pyscryfall-0.1.2.tar.gz", hash = "sha256:a08df25413e36ee206328506e69f8fb9857a87baa0f4c57d0626e2569a3c67b6", size = 34918, upload-time = "2026-05-04T08:09:24.929Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b0/c6/58ba71924cf8df4d9deee7e36d785caebd426130c00ec00bc2e28ff30ef3/pyscryfall-0.2.0.tar.gz", hash = "sha256:760cb3844a66347642f2517948d8d81acf81fe525368513f1c18c73ca2765bdb", size = 41001, upload-time = "2026-06-16T12:43:01.4Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/bd/62/583e357a5f89ff8e541cbdc253f8a024db901573b0f85cb16e072db1fe46/pyscryfall-0.1.2-py3-none-any.whl", hash = "sha256:19963c75fa26cf0b63ba0669bef5645c9bd6f54693d540ef67f4c64b71a5bf23", size = 23024, upload-time = "2026-05-04T08:09:23.657Z" },
+    { url = "https://files.pythonhosted.org/packages/28/9e/4ae672f0ef82a883103c195216c95149658d06f8d6f2b43013663cabd000/pyscryfall-0.2.0-py3-none-any.whl", hash = "sha256:9b03fe51749379068989159fb6caf86f5ce79c292d92b74a94a4f736abd546af", size = 27023, upload-time = "2026-06-16T12:43:00.319Z" },
 ]
 
 [[package]]
