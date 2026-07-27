@@ -2,6 +2,6 @@
 
 # import the application class
 from .app import MTGAssistantApp
+from .import_modal import ImportDeckModal
 
-# export the application class
-__all__ = ["MTGAssistantApp"]
+__all__ = ["MTGAssistantApp", "ImportDeckModal"]

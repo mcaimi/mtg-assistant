@@ -46,6 +46,19 @@ def format_scryfall_card(card: ScryfallCard) -> str:
     if card.rarity:
         lines.append("")
         lines.append(f"Rarity: {card.rarity}")
+
+    if card.prices:
+        p = card.prices
+        parts = []
+        if p.usd:
+            parts.append(f"${p.usd}")
+        if p.eur:
+            parts.append(f"€{p.eur}")
+        if p.tix:
+            parts.append(f"{p.tix} tix")
+        if parts:
+            lines.append(f"Price: {' / '.join(parts)}")
+
     return "\n".join(lines)
 
 

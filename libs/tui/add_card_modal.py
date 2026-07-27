@@ -1,32 +1,33 @@
 #!/usr/bin/env python
 
-# Search Scryfall and add copies of a card to the open deck or binder.
+"""Search Scryfall and add copies of a card to the open deck or binder."""
 
 import asyncio
+import sys
 from collections.abc import Callable
 from functools import partial
 
-# load local classes and modules
-# depends on textual, pyscryfall and pymtgdeck
 try:
     from pymtgdeck import Binder, Deck
-    from pyscryfall import ScryfallApiError, ScryfallCard, search_cards_by_name
-    from textual import on
+    from pyscryfall import (
+        ScryfallApiError,
+        ScryfallCard,
+        autocomplete_card_name,
+        search_cards_by_name,
+    )
+    from textual import on, work
     from textual.app import ComposeResult
     from textual.binding import Binding
     from textual.containers import Horizontal, Vertical, VerticalScroll
     from textual.screen import ModalScreen
-    from textual.widgets import (Button, Input, Label, ListItem, ListView, Static)
+    from textual.widgets import Button, Input, Label, ListItem, ListView, Static
 except ImportError as e:
     print(f"Error importing modules: {e}")
     sys.exit(1)
 
-# load local formatting function
 from .formatting import format_scryfall_card
 
-# an item in the search results list
-# data comes from a ScryfallCard object populated by the search_cards_by_name function
-# scryfall apis must be reachable for this to work
+
 class SearchResultItem(ListItem):
     """A selectable row in the Scryfall search results list."""
 
@@ -35,15 +36,15 @@ class SearchResultItem(ListItem):
         name = card.name or "(unnamed)"
         set_code = card.set or "?"
         cn = card.collector_number or "?"
-        cmc = card.cmc or "?"
+        cmc = card.cmc if card.cmc is not None else "?"
         rarity = card.rarity or "?"
-        super().__init__(Label(f"{name}  [{set_code}] #{cn}  CMC:{cmc}  Rarity: {rarity}"))
+        price = f"${card.prices.usd}" if (card.prices and card.prices.usd) else "N/A"
+        super().__init__(Label(f"{name}  [{set_code}] #{cn}  CMC:{cmc}  {rarity}  {price}"))
 
-# add card modal window in textual
+
 class AddCardModal(ModalScreen[None]):
     """Search Scryfall and add copies of a card to the open deck or binder."""
 
-    # keyboard bindings for the modal
     BINDINGS = [
         Binding("escape", "close", "Close", show=True),
     ]
@@ -62,11 +63,17 @@ class AddCardModal(ModalScreen[None]):
     }
     #search-row {
         height: auto;
-        margin-bottom: 1;
+        margin-bottom: 0;
     }
     #card-name-input {
         width: 1fr;
         margin-right: 1;
+    }
+    #autocomplete-hints {
+        height: auto;
+        min-height: 1;
+        color: $text-muted;
+        margin-bottom: 1;
     }
     #search-results {
         height: 12;
@@ -97,8 +104,8 @@ class AddCardModal(ModalScreen[None]):
         super().__init__()
         self.collection = collection
         self._on_collection_changed = on_collection_changed
+        self._autocomplete_timer = None
 
-    # build the modal window and add widgets to it
     def compose(self) -> ComposeResult:
         is_deck = isinstance(self.collection, Deck)
         title = "Add card to deck" if is_deck else "Add card to binder"
@@ -108,6 +115,7 @@ class AddCardModal(ModalScreen[None]):
             with Horizontal(id="search-row"):
                 yield Input(placeholder="Card name…", id="card-name-input")
                 yield Button("Search", id="search-btn", variant="primary")
+            yield Static("", id="autocomplete-hints")
             yield Static("", id="search-status")
             yield Label("Matching prints (use ↑↓ to choose one):")
             yield ListView(id="search-results", initial_index=None)
@@ -119,11 +127,42 @@ class AddCardModal(ModalScreen[None]):
             with VerticalScroll(id="preview-scroll"):
                 yield Static("", id="preview-static")
 
-    # focus on the card name input when the modal is opened
     def on_mount(self) -> None:
         self.query_one("#card-name-input", Input).focus()
 
-    # search button callback
+    # --- Autocomplete ---
+
+    @on(Input.Changed, "#card-name-input")
+    def card_name_changed(self, event: Input.Changed) -> None:
+        if self._autocomplete_timer is not None:
+            self._autocomplete_timer.stop()
+            self._autocomplete_timer = None
+        query = event.value.strip()
+        if len(query) < 2:
+            self.query_one("#autocomplete-hints", Static).update("")
+            return
+        self._autocomplete_timer = self.set_timer(
+            0.3, partial(self._fetch_autocomplete, query)
+        )
+
+    @work
+    async def _fetch_autocomplete(self, query: str) -> None:
+        loop = asyncio.get_running_loop()
+        try:
+            catalog = await loop.run_in_executor(
+                None, partial(autocomplete_card_name, query)
+            )
+            suggestions = catalog.data[:6]
+            hints = self.query_one("#autocomplete-hints", Static)
+            if suggestions:
+                hints.update("[dim]" + "  |  ".join(suggestions) + "[/dim]")
+            else:
+                hints.update("")
+        except Exception:
+            pass
+
+    # --- Search ---
+
     @on(Button.Pressed, "#search-btn")
     async def search_pressed(self) -> None:
         query = self.query_one("#card-name-input", Input).value.strip()
@@ -158,7 +197,8 @@ class AddCardModal(ModalScreen[None]):
         await results.extend(SearchResultItem(c) for c in cards)
         results.index = 0
 
-    # add card button callback
+    # --- Add card ---
+
     @on(Button.Pressed, "#add-btn")
     def add_pressed(self) -> None:
         status = self.query_one("#search-status", Static)
@@ -181,10 +221,6 @@ class AddCardModal(ModalScreen[None]):
         card = highlighted.card
         col = self.collection
 
-        # check if the collection is a deck or a binder
-        # for Decks, there are limits on the number of cards and the number of copies of each card
-        # for Binders, there are no limits
-        # so check the limits for decks and apply them to the collection
         if isinstance(col, Deck):
             current = col.get_card_copy_count(card)
             room_copies = col.max_card_copy_count - current
